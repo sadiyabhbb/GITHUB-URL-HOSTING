@@ -1,202 +1,179 @@
-// index.js — Bot Hosting Panel (v2.1)
-// ✅ Auto create folder
-// ✅ Works on Render, Replit, Termux, Local
-// ✅ Auto restart + missing module install
-
 import express from "express";
-import http from "http";
 import { Server } from "socket.io";
+import http from "http";
+import { exec, spawn } from "child_process";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
+import { join } from "path";
 import bodyParser from "body-parser";
-import path from "path";
-import fs from "fs";
-import { spawn } from "child_process";
 import simpleGit from "simple-git";
-import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import moment from "moment-timezone";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+const PORT = process.env.PORT || 3000;
+const botsFile = "bots.json";
+
+app.use(express.static("public"));
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public")));
 
-// ====== FOLDER SETUP ======
-const APPS_DIR = path.join(__dirname, "apps");
-if (!fs.existsSync(APPS_DIR)) {
-  fs.mkdirSync(APPS_DIR, { recursive: true });
-  console.log("📁 Created apps directory:", APPS_DIR);
+let bots = existsSync(botsFile)
+  ? JSON.parse(readFileSync(botsFile))
+  : [];
+
+const processes = {};
+
+function saveBots() {
+  writeFileSync(botsFile, JSON.stringify(bots, null, 2));
 }
 
-// ====== BOT STORAGE ======
-const bots = new Map(); // id -> { id, name, dir, proc, logs, status, entry }
-
-function appendLog(id, chunk) {
-  const bot = bots.get(id);
-  if (!bot) return;
-  const txt = String(chunk);
-  bot.logs.push(txt);
-  if (bot.logs.length > 5000) bot.logs.splice(0, bot.logs.length - 5000);
-  io.to(id).emit("log", txt);
-  console.log(`[${bot.name}] ${txt.trim()}`);
+function logNow() {
+  return moment().tz("Asia/Dhaka").format("HH:mm:ss");
 }
 
-function spawnProcess(id, cmd, args, opts = {}) {
-  const proc = spawn(cmd, args, { ...opts, shell: true });
-  proc.stdout.on("data", (d) => appendLog(id, d));
-  proc.stderr.on("data", (d) => appendLog(id, d));
-  proc.on("close", (code) => {
-    appendLog(id, `\n=== process exited (code ${code}) ===\n`);
-  });
-  return proc;
+function sendBots() {
+  io.emit("bots", bots);
 }
 
-// ====== DEPLOY ======
+// ✅ Deploy Bot
 app.post("/api/deploy", async (req, res) => {
   try {
-    const { repoUrl, name, entry = "index.js" } = req.body;
-    if (!repoUrl) return res.status(400).json({ error: "repoUrl required" });
+    const { repoUrl, name, entry } = req.body;
+    if (!repoUrl) return res.json({ error: "Repository URL required" });
 
     const id = uuidv4();
-    const repoName = name ? name.replace(/\s+/g, "-") : `bot-${id.substring(0, 6)}`;
-    const appDir = path.join(APPS_DIR, repoName);
+    const botName = name || repoUrl.split("/").pop().replace(".git", "");
+    const folder = join(process.cwd(), botName);
+
     const git = simpleGit();
+    bots.push({ id, name: botName, repoUrl, folder, entry, status: "cloning" });
+    saveBots();
+    sendBots();
 
-    if (fs.existsSync(appDir)) fs.rmSync(appDir, { recursive: true, force: true });
-    fs.mkdirSync(appDir, { recursive: true });
+    await git.clone(repoUrl, folder);
 
-    bots.set(id, { id, name: repoName, dir: appDir, proc: null, logs: [], status: "cloning", entry });
-    io.emit("bots", Array.from(bots.values()));
+    bots = bots.map(b => (b.id === id ? { ...b, status: "installing" } : b));
+    saveBots();
+    sendBots();
 
-    appendLog(id, `🌀 Cloning ${repoUrl}...\n`);
-    await git.clone(repoUrl, appDir);
-    appendLog(id, "✅ Clone complete.\n");
-
-    bots.get(id).status = "installing";
-    io.emit("bots", Array.from(bots.values()));
-
-    appendLog(id, "📦 Installing dependencies...\n");
-    await new Promise((resolve, reject) => {
-      const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], { cwd: appDir, shell: true });
-      npm.stdout.on("data", (d) => appendLog(id, d));
-      npm.stderr.on("data", (d) => appendLog(id, d));
-      npm.on("close", (code) => {
-        if (code === 0) resolve();
-        else reject(new Error("npm install failed"));
-      });
+    exec(`cd ${folder} && npm install`, (err) => {
+      if (err) {
+        bots = bots.map(b => (b.id === id ? { ...b, status: "error" } : b));
+        saveBots();
+        sendBots();
+        return;
+      }
+      startBot(id);
     });
 
-    bots.get(id).status = "stopped";
-    appendLog(id, "✅ Bot ready to start!\n");
-    io.emit("bots", Array.from(bots.values()));
-    res.json({ id, name: repoName });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message });
+    res.json({ id, name: botName });
+  } catch (err) {
+    console.error(err);
+    res.json({ error: err.message });
   }
 });
 
-// ====== START BOT ======
+// ✅ Start Bot
 app.post("/api/:id/start", (req, res) => {
-  const id = req.params.id;
-  const bot = bots.get(id);
-  if (!bot) return res.status(404).json({ error: "Bot not found" });
-  if (bot.proc) return res.json({ message: "Already running" });
-
-  const entryPath = path.join(bot.dir, bot.entry);
-  if (!fs.existsSync(entryPath))
-    return res.status(400).json({ error: `Entry file ${bot.entry} not found` });
-
-  appendLog(id, `🚀 Starting bot: node ${bot.entry}\n`);
-  const proc = spawn("node", [bot.entry], { cwd: bot.dir, shell: true, env: { ...process.env } });
-
-  proc.stdout.on("data", (d) => appendLog(id, d));
-  proc.stderr.on("data", (d) => {
-    appendLog(id, d);
-    const match = d.toString().match(/Cannot find module '(.+?)'/);
-    if (match) {
-      const missing = match[1];
-      appendLog(id, `\n[Auto-Fix] Installing missing module: ${missing}\n`);
-      spawnProcess(id, "npm", ["install", missing, "--save"], { cwd: bot.dir });
-    }
-  });
-
-  proc.on("close", (code) => {
-    appendLog(id, `\n=== Bot exited (code ${code}) ===\n`);
-    bot.proc = null;
-    bot.status = "stopped";
-    io.emit("bots", Array.from(bots.values()));
-
-    // Auto-restart if crash
-    if (code !== 0) {
-      appendLog(id, "⚠️ Bot crashed — restarting in 5s...\n");
-      setTimeout(() => startBot(id), 5000);
-    }
-  });
-
-  bot.proc = proc;
-  bot.status = "running";
-  io.emit("bots", Array.from(bots.values()));
+  const { id } = req.params;
+  startBot(id);
   res.json({ message: "Bot started" });
 });
 
+// ✅ Stop Bot
+app.post("/api/:id/stop", (req, res) => {
+  const { id } = req.params;
+  stopBot(id);
+  res.json({ message: "Bot stopped" });
+});
+
+// ✅ Update Bot (git pull + restart)
+app.post("/api/:id/update", async (req, res) => {
+  const { id } = req.params;
+  const bot = bots.find(b => b.id === id);
+  if (!bot) return res.json({ error: "Bot not found" });
+
+  try {
+    const git = simpleGit(bot.folder);
+    await git.pull();
+    stopBot(id);
+    setTimeout(() => startBot(id), 2000);
+    res.json({ message: `✅ ${bot.name} updated & restarted!` });
+  } catch (err) {
+    console.error(err);
+    res.json({ error: "Update failed: " + err.message });
+  }
+});
+
+// ✅ Get Bots List
+app.get("/api/bots", (req, res) => res.json(bots));
+
+// ✅ Get Logs
+app.get("/api/:id/logs", (req, res) => {
+  const { id } = req.params;
+  const bot = bots.find(b => b.id === id);
+  if (!bot) return res.json({ logs: [] });
+  res.json({ logs: bot.logs || [] });
+});
+
+// ✅ Functions
 function startBot(id) {
-  const bot = bots.get(id);
-  if (!bot || bot.proc) return;
-  appendLog(id, "♻️ Auto restarting bot...\n");
-  const proc = spawn("node", [bot.entry], { cwd: bot.dir, shell: true });
-  proc.stdout.on("data", (d) => appendLog(id, d));
-  proc.stderr.on("data", (d) => appendLog(id, d));
-  proc.on("close", () => {
-    appendLog(id, "\n=== Bot exited again ===\n");
-    bot.proc = null;
-    bot.status = "stopped";
-    io.emit("bots", Array.from(bots.values()));
-  });
-  bot.proc = proc;
+  const bot = bots.find(b => b.id === id);
+  if (!bot) return;
+
+  const entry = bot.entry || "index.js";
+  const proc = spawn("node", [entry], { cwd: bot.folder });
+
+  processes[id] = proc;
   bot.status = "running";
-  io.emit("bots", Array.from(bots.values()));
+  bot.logs = bot.logs || [];
+  saveBots();
+  sendBots();
+
+  proc.stdout.on("data", (data) => {
+    const msg = `[${logNow()}] ${data}`;
+    io.emit("log", msg);
+    bot.logs.push(msg);
+  });
+
+  proc.stderr.on("data", (data) => {
+    const msg = `[${logNow()}] ⚠️ ${data}`;
+    io.emit("log", msg);
+    bot.logs.push(msg);
+  });
+
+  proc.on("exit", () => {
+    bot.status = "stopped";
+    saveBots();
+    sendBots();
+  });
 }
 
-// ====== STOP BOT ======
-app.post("/api/:id/stop", (req, res) => {
-  const id = req.params.id;
-  const bot = bots.get(id);
-  if (!bot) return res.status(404).json({ error: "Bot not found" });
-  if (!bot.proc) return res.json({ message: "Not running" });
+function stopBot(id) {
+  if (processes[id]) {
+    processes[id].kill();
+    delete processes[id];
+  }
+  bots = bots.map(b => (b.id === id ? { ...b, status: "stopped" } : b));
+  saveBots();
+  sendBots();
+}
 
-  bot.proc.kill();
-  bot.proc = null;
-  bot.status = "stopped";
-  io.emit("bots", Array.from(bots.values()));
-  appendLog(id, "🛑 Bot stopped.\n");
-  res.json({ message: "Stopped" });
+// ✅ Restore bots on restart (optional auto start)
+bots.forEach(b => {
+  b.status = "stopped";
 });
 
-// ====== LOGS ======
-app.get("/api/bots", (req, res) => {
-  res.json(Array.from(bots.values()));
-});
-app.get("/api/:id/logs", (req, res) => {
-  const bot = bots.get(req.params.id);
-  if (!bot) return res.status(404).json({ error: "Bot not found" });
-  res.json({ logs: bot.logs.slice(-1000) });
-});
-
-// ====== SOCKET ======
+// ✅ Socket.io
 io.on("connection", (socket) => {
+  console.log("🟢 Client connected");
+  socket.emit("bots", bots);
   socket.on("subscribe", (id) => {
-    const bot = bots.get(id);
-    if (!bot) return socket.emit("error", "Bot not found");
-    socket.join(id);
-    socket.emit("init", bot.logs.join(""));
+    const bot = bots.find(b => b.id === id);
+    if (bot && bot.logs) socket.emit("init", bot.logs.join(""));
   });
 });
 
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ Bot Panel running on port ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Panel running on http://localhost:${PORT}`));
