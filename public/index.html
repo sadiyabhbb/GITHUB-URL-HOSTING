@@ -1,278 +1,128 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>🤖 Bot Hosting Panel</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bot Hosting Panel v2.3</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    :root {
-      --bg: #0d0d0d;
-      --card: #141414;
-      --accent: #00ff99;
-      --text: #f2f2f2;
-      --sub: #aaa;
-      --danger: #ff4d4d;
-      --warn: #ffcc00;
-      --info: #3399ff;
-    }
-
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      margin: 0;
-      padding: 20px;
-    }
-
-    h2 { text-align: center; }
-
-    .panel {
-      background: var(--card);
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
-      margin-bottom: 20px;
-      transition: all 0.3s ease;
-    }
-
-    input, button {
-      padding: 10px;
-      border-radius: 6px;
-      border: none;
-      outline: none;
-      font-size: 15px;
-      margin: 6px 0;
-    }
-
-    input {
-      width: 100%;
-      background: #1e1e1e;
-      color: #fff;
-    }
-
-    button {
-      cursor: pointer;
-      color: #fff;
-      background: #1c1c1c;
-      transition: background 0.2s ease;
-    }
-
-    button:hover { background: #333; }
-
-    .deploy-row {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    @media (min-width: 700px) {
-      .deploy-row {
-        flex-direction: row;
-        align-items: center;
-      }
-      input { flex: 1; }
-      button { width: 150px; }
-    }
-
-    .bots {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 12px;
-    }
-
-    .bot {
-      background: #1a1a1a;
-      border-radius: 8px;
-      padding: 12px;
-      text-align: center;
-      box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
-      transition: transform 0.2s;
-    }
-
-    .bot:hover { transform: scale(1.03); }
-
-    .status {
-      font-size: 13px;
-      margin-bottom: 6px;
-    }
-
-    .status.running { color: var(--accent); }
-    .status.stopped { color: var(--danger); }
-    .status.installing { color: var(--warn); }
-    .status.cloning { color: var(--info); }
-
-    .bot button {
-      background: #222;
-      color: #fff;
-      padding: 6px 10px;
-      margin: 3px;
-      border-radius: 6px;
-      font-size: 13px;
-    }
-
-    .bot button:hover { background: #444; }
-
-    pre {
-      background: #000;
-      color: #0f0;
-      padding: 14px;
-      border-radius: 8px;
-      height: 340px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      font-size: 13px;
-      box-shadow: inset 0 0 10px #111;
-    }
-
-    #clear {
-      background: var(--danger);
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    footer {
-      text-align: center;
-      margin-top: 30px;
-      color: var(--sub);
-      font-size: 13px;
-    }
-
-    .loading {
-      color: var(--warn);
-      text-align: center;
-      padding: 10px;
-      font-size: 14px;
-    }
-
-    .accent { color: var(--accent); }
+    body { background: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border-radius: 1rem; }
+    .btn { transition: all .2s ease; }
+    .btn:hover { transform: scale(1.05); }
+    .scroll { max-height: 250px; overflow-y: auto; scrollbar-width: thin; }
+    .log-box { font-family: monospace; background: #0a0a0a; border-radius: 0.5rem; padding: 1rem; }
   </style>
-  <script src="/socket.io/socket.io.js"></script>
 </head>
-<body>
-  <h2>🤖 Bot Hosting Panel</h2>
+<body class="p-6">
 
-  <div class="panel">
-    <div class="deploy-row">
-      <input id="repo" placeholder="🔗 Git repo URL (e.g. https://github.com/user/repo.git)">
-      <input id="name" placeholder="📁 Optional name">
-      <input id="entry" placeholder="▶️ Entry file (default index.js)">
-      <button id="deploy">🚀 Deploy</button>
-    </div>
-    <small style="color: var(--sub)">Repo will auto-clone, install dependencies & start the bot.</small>
+  <h1 class="text-3xl font-bold text-center mb-6">🤖 Bot Hosting Panel <span class="text-indigo-400">v2.3</span></h1>
+
+  <div class="glass p-6 max-w-3xl mx-auto mb-8">
+    <h2 class="text-xl mb-4 font-semibold">📦 Deploy New Bot</h2>
+    <form id="deployForm" class="space-y-3">
+      <input id="repoUrl" class="w-full p-2 rounded bg-gray-800 border border-gray-700" placeholder="Git Repository URL" required>
+      <input id="name" class="w-full p-2 rounded bg-gray-800 border border-gray-700" placeholder="Custom Name (optional)">
+      <input id="entry" class="w-full p-2 rounded bg-gray-800 border border-gray-700" placeholder="Entry file (default: index.js)">
+      <button class="btn bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded w-full">🚀 Deploy Bot</button>
+    </form>
   </div>
 
-  <div class="panel">
-    <h3>⚙️ Deployed Bots</h3>
-    <div id="bots" class="bots"><div class="loading">Fetching bots...</div></div>
-  </div>
+  <div id="bots" class="grid gap-4 max-w-5xl mx-auto"></div>
 
-  <div class="panel">
-    <h3>📜 Live Logs</h3>
-    <pre id="logs">No logs yet. Select a bot and click “Attach”.</pre>
-    <button id="clear">🧹 Clear Logs</button>
+  <div id="logSection" class="glass p-4 max-w-4xl mx-auto mt-6 hidden">
+    <h3 class="text-lg font-semibold mb-2">🧾 Live Logs</h3>
+    <pre id="logs" class="log-box scroll"></pre>
   </div>
-
-  <footer>💻 Panel by <span class="accent">SadiyaBhbb</span> — Node.js Hosting Panel v2.2</footer>
 
   <script>
     const socket = io();
-    let currentId = null;
+    const botsDiv = document.getElementById("bots");
+    const logsBox = document.getElementById("logs");
+    const logSection = document.getElementById("logSection");
 
-    async function refreshBots() {
+    async function loadBots() {
       const res = await fetch("/api/bots");
       const bots = await res.json();
-      const container = document.getElementById("bots");
-      container.innerHTML = "";
+      renderBots(bots);
+    }
 
+    function renderBots(bots) {
+      botsDiv.innerHTML = "";
       if (!bots.length) {
-        container.innerHTML = '<div class="loading">No bots deployed yet.</div>';
+        botsDiv.innerHTML = `<p class="text-center text-gray-400">No bots deployed yet.</p>`;
         return;
       }
-
       bots.forEach(b => {
-        const el = document.createElement("div");
-        el.className = "bot";
-        el.innerHTML = `
-          <strong>${b.name}</strong>
-          <div class="status ${b.status}">Status: ${b.status}</div>
-          <div>
-            <button onclick="start('${b.id}')">▶️ Start</button>
-            <button onclick="stop('${b.id}')">⏹ Stop</button>
-            <button onclick="restart('${b.id}')">🔄 Restart</button>
-            <button onclick="update('${b.id}')">🆙 Update</button>
-            <button onclick="attach('${b.id}')">📡 Attach</button>
-          </div>`;
-        container.appendChild(el);
+        const card = document.createElement("div");
+        card.className = "glass p-4 rounded-xl";
+        card.innerHTML = `
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="text-lg font-bold">${b.name}</h3>
+            <span class="text-sm ${b.status === "running" ? "text-green-400" : b.status === "error" ? "text-red-400" : "text-gray-400"}">${b.status}</span>
+          </div>
+          <p class="text-xs text-gray-400 mb-2">${b.repoUrl}</p>
+          <div class="flex gap-2 flex-wrap">
+            <button onclick="startBot('${b.id}')" class="btn bg-green-600 px-3 py-1 rounded">Start</button>
+            <button onclick="stopBot('${b.id}')" class="btn bg-red-600 px-3 py-1 rounded">Stop</button>
+            <button onclick="updateBot('${b.id}')" class="btn bg-yellow-500 px-3 py-1 rounded">Update</button>
+            <button onclick="showLogs('${b.id}')" class="btn bg-gray-700 px-3 py-1 rounded">Logs</button>
+          </div>
+        `;
+        botsDiv.appendChild(card);
       });
     }
 
-    async function deploy() {
-      const repo = document.getElementById("repo").value.trim();
-      const name = document.getElementById("name").value.trim();
-      const entry = document.getElementById("entry").value.trim() || "index.js";
-      if (!repo) return alert("Please enter a Git repo URL.");
-      const btn = document.getElementById("deploy");
-      btn.disabled = true;
-      btn.textContent = "⚙️ Deploying...";
-      try {
-        const res = await fetch("/api/deploy", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ repoUrl: repo, name, entry })
-        });
-        const j = await res.json();
-        if (j.error) alert("❌ " + j.error);
-        else alert("✅ Deployed: " + j.name);
-        refreshBots();
-      } catch (err) {
-        alert("❌ Deploy failed: " + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "🚀 Deploy";
-      }
+    async function startBot(id) {
+      await fetch(`/api/${id}/start`, { method: "POST" });
+      loadBots();
     }
 
-    async function start(id) { await fetch(`/api/${id}/start`, { method: "POST" }); refreshBots(); }
-    async function stop(id) { await fetch(`/api/${id}/stop`, { method: "POST" }); refreshBots(); }
-    async function restart(id) { await fetch(`/api/${id}/stop`, { method: "POST" }); setTimeout(() => start(id), 2000); }
-
-    async function update(id) {
-      if (!confirm("🆙 Update this bot from GitHub and restart?")) return;
-      const res = await fetch(`/api/${id}/update`, { method: "POST" });
-      const j = await res.json();
-      alert(j.message || "Updated!");
-      refreshBots();
+    async function stopBot(id) {
+      await fetch(`/api/${id}/stop`, { method: "POST" });
+      loadBots();
     }
 
-    async function attach(id) {
-      currentId = id;
-      const pre = document.getElementById("logs");
-      pre.textContent = "📡 Attached. Waiting for logs...";
-      socket.emit("subscribe", id);
+    async function updateBot(id) {
+      await fetch(`/api/${id}/update`, { method: "POST" });
+      loadBots();
+    }
+
+    async function showLogs(id) {
+      logSection.classList.remove("hidden");
+      logsBox.innerHTML = "Loading logs...";
       const res = await fetch(`/api/${id}/logs`);
-      const j = await res.json();
-      if (j.logs) pre.textContent = j.logs.join("");
-      pre.scrollTop = pre.scrollHeight;
+      const data = await res.json();
+      logsBox.textContent = data.logs.join("\n");
+      socket.emit("subscribe", id);
     }
 
-    document.getElementById("deploy").onclick = deploy;
-    document.getElementById("clear").onclick = () => document.getElementById("logs").textContent = "";
-
-    socket.on("log", chunk => {
-      const pre = document.getElementById("logs");
-      pre.textContent += chunk;
-      pre.scrollTop = pre.scrollHeight;
+    document.getElementById("deployForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const repoUrl = document.getElementById("repoUrl").value.trim();
+      const name = document.getElementById("name").value.trim();
+      const entry = document.getElementById("entry").value.trim();
+      if (!repoUrl) return alert("Please enter a repository URL.");
+      const res = await fetch("/api/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoUrl, name, entry }),
+      });
+      const data = await res.json();
+      if (data.error) alert(data.error);
+      else alert(`✅ Bot ${data.name} deploying...`);
+      loadBots();
+      e.target.reset();
     });
 
-    socket.on("init", data => {
-      const pre = document.getElementById("logs");
-      pre.textContent = data;
-      pre.scrollTop = pre.scrollHeight;
+    socket.on("bots", renderBots);
+    socket.on("log", (msg) => {
+      logsBox.textContent += msg + "\n";
+      logsBox.scrollTop = logsBox.scrollHeight;
     });
 
-    socket.on("bots", refreshBots);
-    window.addEventListener("load", refreshBots);
+    loadBots();
   </script>
 </body>
 </html>
