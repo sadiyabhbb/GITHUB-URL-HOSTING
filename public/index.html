@@ -13,6 +13,7 @@
       --sub: #aaa;
       --danger: #ff4d4d;
       --warn: #ffcc00;
+      --info: #3399ff;
     }
 
     body {
@@ -23,10 +24,7 @@
       padding: 20px;
     }
 
-    h1, h2 {
-      text-align: center;
-      margin: 10px 0;
-    }
+    h2 { text-align: center; }
 
     .panel {
       background: var(--card);
@@ -59,9 +57,7 @@
       transition: background 0.2s ease;
     }
 
-    button:hover {
-      background: #333;
-    }
+    button:hover { background: #333; }
 
     .deploy-row {
       display: flex;
@@ -74,12 +70,8 @@
         flex-direction: row;
         align-items: center;
       }
-      input {
-        flex: 1;
-      }
-      button {
-        width: 150px;
-      }
+      input { flex: 1; }
+      button { width: 150px; }
     }
 
     .bots {
@@ -97,27 +89,17 @@
       transition: transform 0.2s;
     }
 
-    .bot:hover {
-      transform: scale(1.03);
-    }
+    .bot:hover { transform: scale(1.03); }
 
     .status {
       font-size: 13px;
       margin-bottom: 6px;
     }
 
-    .status.running {
-      color: var(--accent);
-    }
-    .status.stopped {
-      color: var(--danger);
-    }
-    .status.installing {
-      color: var(--warn);
-    }
-    .status.cloning {
-      color: #3399ff;
-    }
+    .status.running { color: var(--accent); }
+    .status.stopped { color: var(--danger); }
+    .status.installing { color: var(--warn); }
+    .status.cloning { color: var(--info); }
 
     .bot button {
       background: #222;
@@ -128,9 +110,7 @@
       font-size: 13px;
     }
 
-    .bot button:hover {
-      background: #444;
-    }
+    .bot button:hover { background: #444; }
 
     pre {
       background: #000;
@@ -165,9 +145,7 @@
       font-size: 14px;
     }
 
-    .accent {
-      color: var(--accent);
-    }
+    .accent { color: var(--accent); }
   </style>
   <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -181,7 +159,7 @@
       <input id="entry" placeholder="▶️ Entry file (default index.js)">
       <button id="deploy">🚀 Deploy</button>
     </div>
-    <small style="color: var(--sub)">After deploy, repo will be cloned & dependencies installed automatically.</small>
+    <small style="color: var(--sub)">Repo will auto-clone, install dependencies & start the bot.</small>
   </div>
 
   <div class="panel">
@@ -195,7 +173,7 @@
     <button id="clear">🧹 Clear Logs</button>
   </div>
 
-  <footer>💻 Panel by <span class="accent">SadiyaBhbb</span> — Node.js Hosting Panel v2.1</footer>
+  <footer>💻 Panel by <span class="accent">SadiyaBhbb</span> — Node.js Hosting Panel v2.2</footer>
 
   <script>
     const socket = io();
@@ -222,6 +200,7 @@
             <button onclick="start('${b.id}')">▶️ Start</button>
             <button onclick="stop('${b.id}')">⏹ Stop</button>
             <button onclick="restart('${b.id}')">🔄 Restart</button>
+            <button onclick="update('${b.id}')">🆙 Update</button>
             <button onclick="attach('${b.id}')">📡 Attach</button>
           </div>`;
         container.appendChild(el);
@@ -232,13 +211,10 @@
       const repo = document.getElementById("repo").value.trim();
       const name = document.getElementById("name").value.trim();
       const entry = document.getElementById("entry").value.trim() || "index.js";
-
       if (!repo) return alert("Please enter a Git repo URL.");
-
       const btn = document.getElementById("deploy");
       btn.disabled = true;
       btn.textContent = "⚙️ Deploying...";
-
       try {
         const res = await fetch("/api/deploy", {
           method: "POST",
@@ -246,11 +222,11 @@
           body: JSON.stringify({ repoUrl: repo, name, entry })
         });
         const j = await res.json();
-        if (j.error) alert("❌ Error: " + j.error);
+        if (j.error) alert("❌ " + j.error);
         else alert("✅ Deployed: " + j.name);
         refreshBots();
       } catch (err) {
-        alert("Deploy failed: " + err.message);
+        alert("❌ Deploy failed: " + err.message);
       } finally {
         btn.disabled = false;
         btn.textContent = "🚀 Deploy";
@@ -260,6 +236,14 @@
     async function start(id) { await fetch(`/api/${id}/start`, { method: "POST" }); refreshBots(); }
     async function stop(id) { await fetch(`/api/${id}/stop`, { method: "POST" }); refreshBots(); }
     async function restart(id) { await fetch(`/api/${id}/stop`, { method: "POST" }); setTimeout(() => start(id), 2000); }
+
+    async function update(id) {
+      if (!confirm("🆙 Update this bot from GitHub and restart?")) return;
+      const res = await fetch(`/api/${id}/update`, { method: "POST" });
+      const j = await res.json();
+      alert(j.message || "Updated!");
+      refreshBots();
+    }
 
     async function attach(id) {
       currentId = id;
