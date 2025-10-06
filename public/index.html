@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HEADSHOT PANEL v3.5</title>
+  <title>HEADSHOT PANEL v3.6 (Pro Edition)</title>
 
   <style>
     :root{
@@ -27,7 +27,6 @@
       padding:20px;
     }
 
-    /* header */
     header{
       max-width:1200px;
       margin:0 auto 18px;
@@ -36,49 +35,37 @@
       align-items:center;
       gap:12px;
     }
-    .brand {
-      display:flex; flex-direction:column;
-    }
     .brand h1 { margin:0; color:var(--accent); font-size:18px; letter-spacing:0.6px; }
-    .brand small{ color:var(--muted); font-size:12px; margin-top:4px; }
-
-    .header-actions { display:flex; gap:10px; align-items:center; }
+    .brand small{ color:var(--muted); font-size:12px; }
 
     .btn { background:linear-gradient(90deg,var(--accent), #00d68a); color:#04120b; padding:8px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
-    .btn.ghost { background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.03); box-shadow:none; font-weight:600; }
-    .small { padding:6px 8px; font-size:13px; border-radius:8px; }
+    .btn.ghost { background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.03); }
 
-    /* layout */
     .wrap { max-width:1200px; margin:0 auto; display:grid; grid-template-columns:1fr 440px; gap:18px; align-items:start; }
     @media(max-width:980px){ .wrap { grid-template-columns: 1fr; } }
 
-    /* left panel */
     .panel { background:var(--panel); border-radius:12px; padding:14px; border:1px solid rgba(255,255,255,0.02); box-shadow:0 10px 30px rgba(0,0,0,0.6); }
+
     .deploy-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
-    .deploy-row input { background:transparent; border:1px solid rgba(255,255,255,0.04); padding:10px 12px; border-radius:8px; color:var(--white); min-width:0; flex:1; }
-    .muted { color:var(--muted); font-size:13px; }
+    .deploy-row input { background:transparent; border:1px solid rgba(255,255,255,0.04); padding:10px 12px; border-radius:8px; color:var(--white); flex:1; }
 
     .bots { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:10px; }
-    .bot-card { background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:12px; border-radius:10px; border:1px solid var(--accent-weak); display:flex; flex-direction:column; gap:10px; }
+    .bot-card { background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:12px; border-radius:10px; border:1px solid var(--accent-weak); display:flex; flex-direction:column; gap:10px; transition:all .2s ease; }
+    .bot-card:hover { border-color:var(--accent); box-shadow:0 0 10px rgba(0,255,136,0.1); }
+
     .bot-row { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
     .bot-name { font-weight:700; color:#eafff0; font-size:14px; }
-    .meta { font-size:12px; color:var(--muted); }
-
-    .status { font-size:12px; padding:6px 8px; border-radius:8px; display:inline-flex; gap:8px; align-items:center; }
-    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; box-shadow:0 8px 22px rgba(0,0,0,0.6); }
+    .status { font-size:12px; padding:6px 8px; border-radius:8px; display:inline-flex; align-items:center; gap:8px; }
+    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
     .running { color:var(--accent); }
-    .running .dot { background:linear-gradient(90deg,var(--accent), #00d68a); box-shadow:0 10px 20px rgba(0,255,136,0.08); }
+    .running .dot { background:var(--accent); }
     .stopped { color:#ff6b6b; }
     .installing { color:#ffb86b; }
-
-    .bot-actions { display:flex; gap:8px; flex-wrap:wrap; }
-    .action-btn { padding:8px 10px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:13px; color:#04120b; background:var(--accent); }
-    .action-btn.ghost { background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.03); color:var(--muted); }
-
     .uptime { font-weight:700; color:#dfffe6; font-size:13px; text-align:right; }
 
-    /* right panel - logs */
-    .log-panel { display:flex; flex-direction:column; gap:10px; }
+    .action-btn { padding:8px 10px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:13px; color:#04120b; background:var(--accent); }
+    .action-btn.ghost { background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.05); }
+
     .log-viewport {
       background:#000;
       border-radius:10px;
@@ -90,320 +77,164 @@
       font-size:13px;
       color:var(--white);
       border:1px solid rgba(255,255,255,0.02);
-      white-space: pre; /* preserve lines, no wrap */
-      overflow-x:auto;   /* allow horizontal scroll if long lines */
+      white-space: pre;
+      scroll-behavior: smooth;
     }
 
-    .log-controls { display:flex; justify-content:space-between; gap:8px; align-items:center; flex-wrap:wrap; }
-    .log-controls .left { display:flex; gap:8px; align-items:center; }
-    .small-btn { background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.03); padding:8px 10px; border-radius:8px; cursor:pointer; }
+    .status-strip { margin-top:8px; padding:8px 10px; border-radius:8px; background:var(--accent-weak); color:var(--accent); font-weight:700; display:none; text-align:center; }
 
-    .status-strip { margin-top:8px; padding:8px 10px; border-radius:8px; background:var(--accent-weak); color:var(--accent); font-weight:700; display:none; }
-
-    /* footer small */
     footer { margin-top:18px; text-align:center; color:var(--muted); font-size:13px; }
-
   </style>
+
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
   <header>
     <div class="brand">
-      <h1>HEADSHOT PANEL</h1>
-      <small class="muted">Professional dashboard — Deploy • Monitor • Uptime • Live Logs</small>
+      <h1>HEADSHOT PANEL v3.6</h1>
+      <small>Pro Edition — Deploy • Update • Uptime • Logs</small>
     </div>
     <div class="header-actions">
-      <button id="refreshBtn" class="btn ghost small">Refresh</button>
+      <button id="refreshBtn" class="btn ghost">Refresh</button>
       <div id="serverTime" class="muted"></div>
     </div>
   </header>
 
   <main class="wrap">
-    <!-- LEFT -->
     <section>
       <div class="panel">
-        <h2 style="margin:0 0 8px 0;">Deploy / Update</h2>
+        <h2>Deploy / Update</h2>
         <div class="deploy-row">
-          <input id="repo" placeholder="Git repo URL (https://github.com/user/repo.git)">
+          <input id="repo" placeholder="Git repo URL">
           <input id="name" placeholder="Optional name" style="max-width:220px;">
           <input id="entry" placeholder="entry (index.js)" style="max-width:140px;">
           <button id="deployBtn" class="btn">Deploy</button>
         </div>
-        <div id="deployStatus" class="status-strip" role="status"></div>
-        <small class="muted">Deploy progress shown here (no popups). Update button pulls & restarts the bot.</small>
+        <div id="deployStatus" class="status-strip"></div>
       </div>
 
       <div class="panel" style="margin-top:14px;">
-        <h2 style="margin:0 0 6px 0;">Deployed Bots</h2>
-        <div id="bots" class="bots" aria-live="polite">
-          <!-- injected -->
-        </div>
+        <h2>Deployed Bots</h2>
+        <div id="bots" class="bots"></div>
       </div>
     </section>
 
-    <!-- RIGHT -->
-    <aside class="panel log-panel">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2 style="margin:0">Live Logs</h2>
-        <div class="muted" id="attachedName">No attached bot</div>
-      </div>
-
-      <pre id="logs" class="log-viewport" aria-live="polite">No logs yet. Auto-attach will connect to a running bot.</pre>
-
-      <div class="log-controls">
-        <div class="left">
-          <button id="autoAttach" class="small-btn">Auto-Attach: ON</button>
-          <button id="clearLogs" class="small-btn">Clear</button>
-          <button id="copyLogs" class="small-btn">Copy</button>
-        </div>
-        <div>
-          <button id="downloadLogs" class="small-btn">Download</button>
-          <button id="attachPrev" class="small-btn">Attach Last</button>
-        </div>
-      </div>
-
-      <div id="statusStrip" class="status-strip"></div>
+    <aside class="panel">
+      <h2>Live Logs</h2>
+      <div id="attachedName" class="muted">No attached bot</div>
+      <pre id="logs" class="log-viewport">No logs yet.</pre>
+      <div class="status-strip" id="statusStrip"></div>
     </aside>
   </main>
 
-  <footer>© HEADSHOT PANEL v3.5 — Built for you</footer>
+  <footer>© HEADSHOT PANEL v3.6 — Auto Update + Restart Engine</footer>
 
 <script>
 (function(){
   const socket = io();
   let bots = [];
   let attachedId = localStorage.getItem('attachedId') || null;
-  let autoAttach = (localStorage.getItem('autoAttach') ?? 'true') === 'true';
   const logsEl = document.getElementById('logs');
   const attachedNameEl = document.getElementById('attachedName');
   const statusStrip = document.getElementById('statusStrip');
   const deployStatus = document.getElementById('deployStatus');
 
-  // Helpers
-  function showStatus(msg, timeout=3000){
+  function showStatus(msg,time=3000){
     statusStrip.textContent = msg;
     statusStrip.style.display = 'block';
-    if(timeout>0) setTimeout(()=> statusStrip.style.display='none', timeout);
+    setTimeout(()=>statusStrip.style.display='none',time);
   }
-  function showDeploy(msg, timeout=4000){
+  function showDeploy(msg,time=4000){
     deployStatus.textContent = msg;
     deployStatus.style.display = 'block';
-    if(timeout>0) setTimeout(()=> deployStatus.style.display='none', timeout);
+    setTimeout(()=>deployStatus.style.display='none',time);
   }
   function fmtUptime(ms){
-    if(!ms || ms<=0) return '-';
-    const s = Math.floor(ms/1000);
-    const days = Math.floor(s/86400);
-    const hours = Math.floor((s%86400)/3600);
-    const mins = Math.floor((s%3600)/60);
-    const secs = s%60;
-    if(days) return `${days}d ${hours}h ${mins}m`;
-    if(hours) return `${hours}h ${mins}m ${secs}s`;
-    if(mins) return `${mins}m ${secs}s`;
-    return `${secs}s`;
+    if(!ms) return '-';
+    const s=Math.floor(ms/1000);
+    const h=Math.floor(s/3600);
+    const m=Math.floor((s%3600)/60);
+    const sec=s%60;
+    if(h) return `${h}h ${m}m ${sec}s`;
+    if(m) return `${m}m ${sec}s`;
+    return `${sec}s`;
   }
-  function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, (m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-  // Render bots list
-  function renderBots(list){
+  async function apiGet(p){const r=await fetch('/api'+p);return r.json();}
+  async function apiPost(p,b){const r=await fetch('/api'+p,{method:'POST',headers:{'content-type':'application/json'},body:b?JSON.stringify(b):undefined});return r.json();}
+
+  async function refreshBots(){
+    const list = await apiGet('/bots');
     bots = list || [];
     const container = document.getElementById('bots');
-    container.innerHTML = '';
-
-    // if autoAttach enabled & nothing attached, attach first running
-    if(autoAttach){
-      const r = bots.find(b=>b.status==='running');
-      if(r && (!attachedId || !bots.some(bb=>bb.id===attachedId && bb.status==='running'))){
-        attachTo(r.id, {silent:true});
-      }
-    }
-
-    if(bots.length === 0){
-      container.innerHTML = '<div class="muted">No bots deployed yet.</div>';
-      return;
-    }
-
+    container.innerHTML='';
+    if(bots.length===0){container.innerHTML='<div class="muted">No bots yet.</div>';return;}
     bots.forEach(b=>{
-      const card = document.createElement('div');
-      card.className = 'bot-card';
-      const statusClass = b.status === 'running' ? 'running' : (b.status === 'installing' ? 'installing' : 'stopped');
-      const startTime = b.startTime ? new Date(b.startTime).getTime() : null;
-      const uptimeText = startTime ? fmtUptime(Date.now() - startTime) : '-';
-      card.innerHTML = `
+      const card=document.createElement('div');
+      card.className='bot-card';
+      const sClass=b.status==='running'?'running':(b.status==='installing'?'installing':'stopped');
+      const uptime=b.uptime?fmtUptime(b.uptime):'-';
+      card.innerHTML=`
         <div class="bot-row">
           <div>
-            <div class="bot-name">${escapeHtml(b.name || b.id)}</div>
-            <div class="meta"><span class="status ${statusClass}"><span class="dot"></span>${escapeHtml(b.status)}</span></div>
+            <div class="bot-name">${b.name}</div>
+            <div class="status ${sClass}"><span class="dot"></span>${b.status}</div>
           </div>
-          <div style="text-align:right">
-            <div class="uptime" data-start="${b.startTime||''}">${uptimeText}</div>
-            <div class="meta" style="margin-top:6px">${b.id.slice(0,8)}</div>
-          </div>
+          <div class="uptime">${uptime}</div>
         </div>
-        <div style="display:flex;gap:8px; margin-top:8px;" class="bot-actions">
+        <div class="bot-actions">
           <button class="action-btn" data-act="start" data-id="${b.id}">Start</button>
           <button class="action-btn ghost" data-act="stop" data-id="${b.id}">Stop</button>
           <button class="action-btn ghost" data-act="attach" data-id="${b.id}">Attach</button>
           <button class="action-btn ghost" data-act="update" data-id="${b.id}">Update</button>
-        </div>
-      `;
+        </div>`;
       container.appendChild(card);
     });
-
-    // wire actions
     container.querySelectorAll('[data-act]').forEach(btn=>{
-      btn.onclick = async () => {
-        const id = btn.getAttribute('data-id'); const act = btn.getAttribute('data-act');
-        try{
-          if(act === 'start') {
-            await apiPost(`/${id}/start`);
-            showStatus('Started '+id);
-          } else if(act === 'stop') {
-            await apiPost(`/${id}/stop`);
-            showStatus('Stopped '+id);
-          } else if(act === 'attach') {
-            attachTo(id);
-          } else if(act === 'update') {
-            showStatus('Updating '+id, 2000);
-            const res = await apiPost(`/${id}/update`);
-            if(res && res.error) showStatus('Update failed',3000);
-            else showStatus('Updated & restarted',3000);
-          }
-          // refresh list after action
-          refreshBots();
-        } catch(e){ console.error(e); showStatus('Action failed'); }
+      btn.onclick=async()=>{
+        const id=btn.dataset.id,act=btn.dataset.act;
+        if(act==='start'){await apiPost('/'+id+'/start');showStatus('Started '+id);}
+        else if(act==='stop'){await apiPost('/'+id+'/stop');showStatus('Stopped '+id);}
+        else if(act==='attach'){attachTo(id);}
+        else if(act==='update'){showStatus('Updating...');await apiPost('/deploy',{repoUrl:'',name:bots.find(x=>x.id===id).name,entry:'index.js'});showStatus('Updated & restarted');}
+        refreshBots();
       };
     });
-
-    // update uptime tick immediately
-    refreshUptimes();
   }
 
-  // API helpers
-  async function apiGet(path){ const res = await fetch('/api'+path); return res.json(); }
-  async function apiPost(path, body){ const res = await fetch('/api'+path, { method:'POST', headers:{'content-type':'application/json'}, body: body ? JSON.stringify(body): undefined }); return res.json(); }
-
-  async function refreshBots(){
-    try{
-      const list = await apiGet('/bots');
-      // normalize to expected fields if backend sends different keys
-      const normalized = (Array.isArray(list) ? list : []).map(x=>({
-        id: x.id || x.name || x.dir || Math.random().toString(36).slice(2,9),
-        name: x.name || x.repoUrl || x.id,
-        status: x.status || (x.proc ? 'running':'stopped'),
-        startTime: x.startTime || x.startTime || x.start || null,
-        repoUrl: x.repoUrl || x.repo || null
-      }));
-      renderBots(normalized);
-    }catch(e){ console.error(e); }
+  async function attachTo(id){
+    attachedId=id;localStorage.setItem('attachedId',id);
+    const b=bots.find(x=>x.id===id);
+    attachedNameEl.textContent=b?b.name:'Unknown';
+    const j=await apiGet('/'+id+'/logs');
+    logsEl.textContent=(j.logs||[]).join('');
+    logsEl.scrollTop=logsEl.scrollHeight;
+    socket.emit('subscribe',id);
+    showStatus('Attached to '+b.name);
   }
 
-  // attach to bot
-  async function attachTo(id, opts={silent:false}){
-    const bot = bots.find(b=>b.id===id);
-    if(!bot) return;
-    attachedId = id; localStorage.setItem('attachedId', id);
-    attachedNameEl.textContent = bot.name;
-    // fetch recent logs
-    try{
-      const j = await apiGet(`/${id}/logs`);
-      const text = (j.logs || []).join('');
-      logsEl.textContent = text;
-      logsEl.scrollTop = logsEl.scrollHeight;
-      socket.emit('subscribe', id);
-      if(!opts.silent) showStatus('Attached to '+bot.name);
-    }catch(e){ console.error(e); showStatus('Attach failed'); }
-  }
-
-  // init actions for right panel
-  document.getElementById('autoAttach').onclick = ()=>{
-    autoAttach = !autoAttach; localStorage.setItem('autoAttach', autoAttach ? 'true':'false');
-    document.getElementById('autoAttach').textContent = 'Auto-Attach: ' + (autoAttach ? 'ON' : 'OFF');
-    if(autoAttach) refreshBots();
-  };
-  document.getElementById('autoAttach').textContent = 'Auto-Attach: ' + (autoAttach ? 'ON' : 'OFF');
-
-  document.getElementById('clearLogs').onclick = ()=>{ logsEl.textContent=''; showStatus('Logs cleared'); };
-  document.getElementById('copyLogs').onclick = async ()=>{
-    try{ await navigator.clipboard.writeText(logsEl.textContent); showStatus('Logs copied'); } catch(e){ showStatus('Copy failed'); }
-  };
-  document.getElementById('downloadLogs').onclick = ()=>{
-    const blob = new Blob([logsEl.textContent], { type:'text/plain' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = (attachedId ? (attachedId + '-logs.txt') : 'logs.txt');
-    document.body.appendChild(a); a.click(); a.remove(); showStatus('Download started');
-  };
-  document.getElementById('attachPrev').onclick = ()=> {
-    if(attachedId) attachTo(attachedId);
-    else showStatus('No previous attachment');
+  document.getElementById('deployBtn').onclick=async()=>{
+    const repo=document.getElementById('repo').value.trim();
+    const name=document.getElementById('name').value.trim();
+    const entry=document.getElementById('entry').value.trim()||'index.js';
+    if(!repo){showDeploy('Enter repo URL');return;}
+    showDeploy('Deploying...');
+    const r=await apiPost('/deploy',{repoUrl:repo,name,entry});
+    if(r.error)showDeploy('❌ '+r.error,5000);
+    else showDeploy('✅ Done '+r.name,4000);
+    refreshBots();
   };
 
-  // deploy form
-  document.getElementById('deployBtn').onclick = async ()=>{
-    const repo = document.getElementById('repo').value.trim();
-    const name = document.getElementById('name').value.trim();
-    const entry = document.getElementById('entry').value.trim() || 'index.js';
-    if(!repo){ showDeploy('Enter repository URL'); return; }
-    showDeploy('🌀 Cloning...');
-    try{
-      const res = await fetch('/api/deploy', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ repoUrl:repo, name, entry })});
-      const j = await res.json();
-      if(j.error) showDeploy('❌ '+ j.error, 5000);
-      else { showDeploy('✅ Deployed '+ (j.name || j.id), 4000); refreshBots(); }
-    }catch(e){ console.error(e); showDeploy('❌ Deploy failed',4000); }
-    document.getElementById('repo').value=''; document.getElementById('name').value=''; document.getElementById('entry').value='';
-  };
+  document.getElementById('refreshBtn').onclick=()=>{refreshBots();showStatus('Refreshed');};
 
-  // refresh button
-  document.getElementById('refreshBtn').onclick = ()=> { refreshBots(); showStatus('Refreshed',1000); };
+  socket.on('bots',list=>{bots=list;refreshBots();});
+  socket.on('log',d=>{logsEl.textContent+=String(d);logsEl.scrollTop=logsEl.scrollHeight;});
+  socket.on('init',d=>{logsEl.textContent=String(d);logsEl.scrollTop=logsEl.scrollHeight;});
 
-  // socket handlers
-  socket.on('connect', ()=> console.log('socket connected'));
-  socket.on('bots', (list)=>{
-    // map if necessary
-    const normalized = (Array.isArray(list)? list : []).map(x => ({
-      id: x.id || x.name || (x.dir? x.dir.split('/').pop(): Math.random().toString(36).slice(2,8)),
-      name: x.name || x.repoUrl || x.id,
-      status: x.status || (x.proc? 'running': 'stopped'),
-      startTime: x.startTime || x.startTime || x.start || null,
-      repoUrl: x.repoUrl || x.repo || null
-    }));
-    renderBots(normalized);
-  });
+  function updateServerTime(){document.getElementById('serverTime').textContent=new Date().toLocaleTimeString();}
+  setInterval(updateServerTime,1000);updateServerTime();
 
-  socket.on('init', (data)=>{
-    // initial logs (string)
-    if(typeof data === 'string') logsEl.textContent = data;
-    else if(Array.isArray(data)) logsEl.textContent = data.join('');
-    logsEl.scrollTop = logsEl.scrollHeight;
-  });
-
-  socket.on('log', (chunk)=>{
-    // append whichever chunk we receive
-    logsEl.textContent += String(chunk);
-    logsEl.scrollTop = logsEl.scrollHeight;
-  });
-
-  // uptime updater
-  function refreshUptimes(){
-    document.querySelectorAll('.uptime').forEach(el=>{
-      const s = el.getAttribute('data-start');
-      if(!s) return;
-      const ms = Date.now() - new Date(s).getTime();
-      el.textContent = fmtUptime(ms);
-    });
-  }
-  setInterval(refreshUptimes, 1000);
-
-  // server time
-  function updateServerTime(){
-    const el = document.getElementById('serverTime'); el.textContent = new Date().toLocaleString();
-  }
-  setInterval(updateServerTime, 1000); updateServerTime();
-
-  // initial load
   refreshBots();
-
 })();
 </script>
 </body>
