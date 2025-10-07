@@ -3,8 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>HEADSHOT PANEL v4.1</title>
-
+  <title>HEADSHOT PANEL v4.2</title>
   <style>
     :root{
       --bg:#0b0f14;
@@ -17,59 +16,51 @@
       --brand-font: system-ui, "Poppins", "Inter", sans-serif;
     }
     *{box-sizing:border-box}
-    body{
-      margin:0;
-      background:linear-gradient(180deg,#071018,#0b0f14);
-      color:#e6f0f2;
-      font-family:var(--brand-font);
-      padding:12px;
-    }
-    header{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:1100px;margin:0 auto 12px;}
-    .brand h1{margin:0;color:var(--accent);font-size:18px;font-weight:700;}
-    .brand small{color:var(--muted);font-size:12px;}
-    .menu-btn{background:transparent;border:1px solid rgba(255,255,255,0.05);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer;}
-    .menu-drawer{
-      position:fixed;top:65px;right:15px;background:var(--panel);
-      border:1px solid rgba(255,255,255,0.05);border-radius:12px;
-      padding:15px;width:90%;max-width:420px;display:none;flex-direction:column;gap:10px;
-      box-shadow:0 0 20px #00fff533;z-index:50;
-    }
-    .menu-drawer.active{display:flex;}
-    .menu-drawer input{background:var(--card);border:1px solid #1a252a;color:var(--muted);padding:10px;border-radius:8px;}
-    .menu-drawer button{background:linear-gradient(90deg,var(--accent),var(--accent-2));border:none;padding:10px;border-radius:8px;color:#001;font-weight:700;cursor:pointer;}
-    .top-row{max-width:1100px;margin:0 auto 8px;display:flex;align-items:center;justify-content:space-between;}
-    .small{font-size:13px;color:var(--muted);}
-    .layout{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:14px;}
-    .console-box{background:#000;color:#fff;font-family:ui-monospace,monospace;font-size:13px;padding:12px;border-radius:10px;height:450px;overflow:auto;white-space:pre-wrap;border:1px solid rgba(255,255,255,0.05);}
-    .controls{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
-    .btn{padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;}
-    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);}
-    .btn.accent{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#001;}
-    .btn.danger{background:var(--danger);color:#fff;}
-    .host-info{background:linear-gradient(90deg,rgba(0,255,209,0.03),rgba(0,179,255,0.02));padding:10px;border-radius:8px;font-size:13px;color:var(--muted);margin-top:10px;}
-    .cards{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;}
-    .card{background:var(--panel);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.05);}
-    .card-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
-    .card-title{font-weight:700;color:var(--accent);}
-    .meta{color:var(--muted);font-size:13px;}
-    .card-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
-    @media(max-width:600px){.console-box{height:320px;}}
+    body{margin:0;background:linear-gradient(180deg,#071018,#0b0f14);color:#e6f0f2;font-family:var(--brand-font);padding:12px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:1100px;margin:0 auto 12px}
+    .brand h1{margin:0;color:var(--accent);font-size:18px;font-weight:700}
+    .brand small{color:var(--muted);font-size:12px}
+    .menu-btn{background:transparent;border:1px solid rgba(255,255,255,0.05);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
+    .menu-drawer{position:fixed;top:65px;right:15px;background:var(--panel);border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:15px;width:90%;max-width:420px;display:none;flex-direction:column;gap:10px;box-shadow:0 0 20px #00fff533;z-index:50}
+    .menu-drawer.active{display:flex}
+    .menu-drawer input{background:var(--card);border:1px solid #1a252a;color:var(--muted);padding:10px;border-radius:8px}
+    .menu-drawer button{background:linear-gradient(90deg,var(--accent),var(--accent-2));border:none;padding:10px;border-radius:8px;color:#001;font-weight:700;cursor:pointer}
+    .top-row{max-width:1100px;margin:0 auto 8px;display:flex;align-items:center;justify-content:space-between}
+    .small{font-size:13px;color:var(--muted)}
+    .layout{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:14px}
+    .console-box{background:#000;color:#fff;font-family:ui-monospace,monospace;font-size:13px;padding:12px;border-radius:10px;height:450px;overflow:auto;white-space:pre-wrap;border:1px solid rgba(255,255,255,0.05)}
+    .controls{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+    .btn{padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted)}
+    .btn.accent{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#001}
+    .btn.danger{background:var(--danger);color:#fff}
+    .host-info{background:linear-gradient(90deg,rgba(0,255,209,0.03),rgba(0,179,255,0.02));padding:10px;border-radius:8px;font-size:13px;color:var(--muted);margin-top:10px}
+    .cards{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding-right:6px}
+    .card{background:var(--panel);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.05)}
+    .card-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    .card-title{font-weight:700;color:var(--accent)}
+    .meta{color:var(--muted);font-size:13px}
+    .card-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+    .card .logs-btn{background:#050608;color:#dfffe6;font-family:monospace;padding:10px;border-radius:8px;display:block;margin-top:10px;white-space:pre-wrap;max-height:0;overflow:hidden;transition:max-height 240ms ease}
+    .card.expanded .logs-btn{max-height:320px}
+    @media(max-width:600px){.console-box{height:320px}.card.expanded .logs-btn{max-height:260px}}
   </style>
 </head>
 <body>
   <header>
     <div class="brand">
       <h1>HEADSHOT PANEL</h1>
-      <small>v4.1 • Dark Neon • Stable</small>
+      <small class="small">v4.2 • Dark Neon • Stable</small>
     </div>
     <button id="menuBtn" class="menu-btn">☰</button>
   </header>
 
   <div id="menuDrawer" class="menu-drawer">
-    <input id="repoUrl" placeholder="Git repo URL (https://github.com/user/repo.git)">
-    <input id="entryFile" placeholder="Entry (index.js)">
-    <input id="botName" placeholder="Bot name (optional)">
-    <button id="deployBtn">Deploy</button>
+    <input id="repo" placeholder="Git repo URL (https://github.com/user/repo.git)">
+    <input id="entry" placeholder="Entry (index.js)">
+    <input id="bname" placeholder="Bot name (optional)">
+    <button id="deployBtn">Create</button>
+    <button id="closeMenu" class="btn ghost">Close</button>
   </div>
 
   <div class="top-row">
@@ -79,64 +70,97 @@
 
   <div class="layout">
     <div class="cards" id="cards"></div>
-    <div class="console-box" id="console">🧠 Console ready...</div>
+    <div class="console-box" id="console">Console ready</div>
     <div class="controls">
       <div>
-        <button id="copyLogs" class="btn ghost">Copy Logs</button>
-        <button id="clearLogs" class="btn ghost">Clear</button>
+        <button id="copyAll" class="btn ghost">Copy Logs</button>
+        <button id="clearAll" class="btn ghost">Clear</button>
       </div>
       <div class="small" id="attached">No bot attached</div>
     </div>
-    <div class="host-info" id="hostInfo">Host info loading...</div>
+    <div class="host-info" id="hostInfo">Host info loading</div>
   </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const menuBtn=document.getElementById("menuBtn");
-const menuDrawer=document.getElementById("menuDrawer");
-const deployBtn=document.getElementById("deployBtn");
-const consoleBox=document.getElementById("console");
-const repoUrl=document.getElementById("repoUrl");
-const entryFile=document.getElementById("entryFile");
-const botName=document.getElementById("botName");
-const copyLogs=document.getElementById("copyLogs");
-const clearLogs=document.getElementById("clearLogs");
-const attached=document.getElementById("attached");
-const cards=document.getElementById("cards");
-const summary=document.getElementById("summary");
-const hostInfo=document.getElementById("hostInfo");
-let bots=[];
+const menuBtn = document.getElementById("menuBtn");
+const menuDrawer = document.getElementById("menuDrawer");
+const deployBtn = document.getElementById("deployBtn");
+const closeMenu = document.getElementById("closeMenu");
+const repo = document.getElementById("repo");
+const entry = document.getElementById("entry");
+const bname = document.getElementById("bname");
+const cards = document.getElementById("cards");
+const consoleBox = document.getElementById("console");
+const copyAll = document.getElementById("copyAll");
+const clearAll = document.getElementById("clearAll");
+const attached = document.getElementById("attached");
+const summary = document.getElementById("summary");
+const hostInfo = document.getElementById("hostInfo");
+let bots = [];
 
-menuBtn.onclick=()=>menuDrawer.classList.toggle("active");
+menuBtn.onclick = () => menuDrawer.classList.toggle("active");
+closeMenu.onclick = () => menuDrawer.classList.remove("active");
 
-deployBtn.onclick=async()=>{
-  const repo=repoUrl.value.trim(),entry=entryFile.value.trim(),name=botName.value.trim();
-  if(!repo||!entry)return alert("Enter repo URL & entry file");
-  socket.emit("deploy",{repo,entry,name});
-  appendLog(`🚀 Deploying ${name||"Unnamed Bot"}...`);
-  menuDrawer.classList.remove("active");
+deployBtn.onclick = async () => {
+  const repoUrl = repo.value.trim();
+  const entryFile = entry.value.trim() || "index.js";
+  const name = bname.value.trim();
+  if (!repoUrl) return alert("Enter repo URL");
+  deployBtn.disabled = true;
+  deployBtn.textContent = "Creating...";
+  try {
+    const res = await fetch("/api/deploy", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ repoUrl, name, entry: entryFile }) });
+    const j = await res.json();
+    if (j.error) alert("Deploy error: " + j.error);
+    else { repo.value = ""; entry.value = ""; bname.value = ""; menuDrawer.classList.remove("active"); }
+  } catch (e) {
+    alert("Deploy failed");
+  }
+  deployBtn.disabled = false;
+  deployBtn.textContent = "Create";
 };
 
-socket.on("bots",list=>renderBots(list));
-socket.on("log",d=>{
-  if(typeof d==="string")appendLog(d);
-  else if(d.text)appendLog(`[${d.id}] ${d.text}`);
+socket.on("bots", list => {
+  bots = list;
+  renderCards(list);
 });
-socket.on("attached",b=>attached.textContent=`Attached: ${b}`);
+socket.on("globalLog", d => {
+  appendConsole(`[${d.id}] ${d.text}`);
+});
+socket.on("log", d => {
+  if (d && d.id && d.text) {
+    const el = document.getElementById("logs-" + d.id);
+    if (el) {
+      el.textContent += d.text;
+      el.scrollTop = el.scrollHeight;
+    }
+  }
+});
 
-copyLogs.onclick=()=>{navigator.clipboard.writeText(consoleBox.innerText);appendLog("📋 Logs copied.");};
-clearLogs.onclick=()=>consoleBox.textContent="🧠 Console cleared.";
+function appendConsole(text) {
+  const el = document.createElement("div");
+  el.textContent = text;
+  consoleBox.appendChild(el);
+  consoleBox.scrollTop = consoleBox.scrollHeight;
+}
 
-function appendLog(t){const l=document.createElement("div");l.textContent=t;consoleBox.appendChild(l);consoleBox.scrollTop=consoleBox.scrollHeight;}
-function renderBots(list){
-  bots=list;
-  cards.innerHTML="";
-  list.forEach(b=>{
-    const c=document.createElement("div");c.className="card";c.innerHTML=`
+function renderCards(list) {
+  cards.innerHTML = "";
+  list.forEach(b => {
+    const c = document.createElement("div");
+    c.className = "card";
+    c.dataset.id = b.id;
+    const statusText = b.status === "running" ? "running" : "stopped";
+    const uptime = b.startTime ? formatUptime(Date.now() - new Date(b.startTime).getTime()) : "-";
+    c.innerHTML = `
       <div class="card-head">
-        <div><div class="card-title">${b.name}</div><div class="meta">entry: ${b.entry}</div></div>
-        <div class="meta">${b.status==="running"?"🟢 running":"🔴 stopped"}</div>
+        <div>
+          <div class="card-title">${escapeHtml(b.name)}</div>
+          <div class="meta">entry: ${escapeHtml(b.entry || "index.js")} • repo: ${b.repoUrl ? "<a href='" + escapeHtml(b.repoUrl) + "' target='_blank' style='color:var(--accent)'>repo</a>" : "(no repo)"}</div>
+        </div>
+        <div class="meta">${statusText} • uptime: ${uptime}</div>
       </div>
       <div class="card-actions">
         <button class="btn accent start">Start</button>
@@ -144,22 +168,72 @@ function renderBots(list){
         <button class="btn ghost restart">Restart</button>
         <button class="btn ghost update">Update</button>
         <button class="btn danger delete">Delete</button>
-      </div>`;
-    c.querySelector(".start").onclick=()=>socket.emit("action",{id:b.id,cmd:"start"});
-    c.querySelector(".stop").onclick=()=>socket.emit("action",{id:b.id,cmd:"stop"});
-    c.querySelector(".restart").onclick=()=>socket.emit("action",{id:b.id,cmd:"restart"});
-    c.querySelector(".update").onclick=()=>socket.emit("action",{id:b.id,cmd:"update"});
-    c.querySelector(".delete").onclick=()=>socket.emit("action",{id:b.id,cmd:"delete"});
+        <button class="btn ghost toggleLogs">Show Logs</button>
+      </div>
+      <div class="logs-btn" id="logs-${b.id}"></div>
+    `;
+    c.querySelector(".start").onclick = async () => { await apiPost(`/${b.id}/start`); };
+    c.querySelector(".stop").onclick = async () => { await apiPost(`/${b.id}/stop`); };
+    c.querySelector(".restart").onclick = async () => { await apiPost(`/${b.id}/restart`); };
+    c.querySelector(".update").onclick = async () => { await apiPost(`/${b.id}/update`); };
+    c.querySelector(".delete").onclick = async () => { if (!confirm("Delete bot?")) return; await apiDelete(`/${b.id}/delete`); };
+    c.querySelector(".toggleLogs").onclick = async () => {
+      c.classList.toggle("expanded");
+      const logEl = document.getElementById("logs-" + b.id);
+      if (c.classList.contains("expanded")) {
+        const r = await fetch(`/api/${b.id}/logs`); const j = await r.json();
+        logEl.textContent = (j.logs || []).join("");
+        logEl.scrollTop = logEl.scrollHeight;
+        socket.emit("subscribe", b.id);
+        attached.textContent = "Attached: " + b.name;
+      } else {
+        attached.textContent = "No bot attached";
+      }
+    };
     cards.appendChild(c);
   });
-  summary.textContent=`${list.filter(x=>x.status==="running").length} running • ${list.filter(x=>x.status!=="running").length} stopped • ${list.length} total`;
+  summary.textContent = `${list.filter(x => x.status === "running").length} running • ${list.filter(x => x.status !== "running").length} stopped • ${list.length} total`;
 }
 
-fetch("/api/host").then(r=>r.json()).then(h=>{
-  hostInfo.innerHTML=`<div><b>Node:</b> ${h.node} • <b>Platform:</b> ${h.platform}/${h.arch}</div>
+function escapeHtml(s) { if (!s) return ""; return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+async function apiPost(p) { const r = await fetch("/api" + p, { method: "POST" }); return r.json(); }
+async function apiDelete(p) { const r = await fetch("/api" + p, { method: "DELETE" }); return r.json(); }
+
+function formatUptime(ms) {
+  if (!ms || ms <= 0) return "-";
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (d) return `${d}d ${h}h ${m}m`;
+  if (h) return `${h}h ${m}m ${sec}s`;
+  if (m) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+copyAll.onclick = async () => {
+  await navigator.clipboard.writeText(consoleBox.textContent);
+};
+clearAll.onclick = () => consoleBox.textContent = "";
+
+fetch("/api/host").then(r => r.json()).then(h => {
+  hostInfo.innerHTML = `<div><b>Node:</b> ${h.node} • <b>Platform:</b> ${h.platform}/${h.arch}</div>
   <div style="margin-top:6px"><b>Path:</b> ${h.cwd}</div>
   <div style="margin-top:6px"><b>CPUs:</b> ${h.cpus} • <b>Bots:</b> ${h.bots}</div>`;
 });
+
+fetch("/api/bots").then(r => r.json()).then(list => {
+  bots = list;
+  renderCards(list);
+});
+
+setInterval(() => {
+  fetch("/api/bots").then(r => r.json()).then(list => {
+    bots = list;
+    renderCards(list);
+  });
+}, 10000);
 </script>
 </body>
 </html>
