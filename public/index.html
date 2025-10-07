@@ -294,6 +294,7 @@
       serverSummary.textContent=`${list.length} total bots • ${list.filter(x=>x.status==='running').length} running`;
       list.forEach(b=>{
         const c=document.createElement('div');c.className='card';
+        // Use data attributes and proper event listeners instead of inline onclick for safety
         c.innerHTML=`
           <div class="card-head">
             <div>
@@ -303,13 +304,20 @@
             <div class="meta">${b.status}</div>
           </div>
           <div class="card-actions">
-            <button class="btn ghost" onclick="fetch('/api/${b.id}/start',{method:'POST'}).then(()=>loadBots())">Start</button>
-            <button class="btn ghost" onclick="fetch('/api/${b.id}/stop',{method:'POST'}).then(()=>loadBots())">Stop</button>
-            <button class="btn ghost" onclick="fetch('/api/${b.id}/restart',{method:'POST'}).then(()=>loadBots())">Restart</button>
-            <button class="btn ghost" onclick="fetch('/api/${b.id}/update',{method:'POST'}).then(()=>loadBots())">Update</button>
-            <button class="btn danger" onclick="fetch('/api/${b.id}/delete',{method:'DELETE'}).then(()=>loadBots())">Delete</button>
-            <button class="btn ghost" onclick="openModal('${b.id}','${b.name}')">Logs</button>
+            <button class="btn ghost btn-start">Start</button>
+            <button class="btn ghost btn-stop">Stop</button>
+            <button class="btn ghost btn-restart">Restart</button>
+            <button class="btn ghost btn-update">Update</button>
+            <button class="btn danger btn-delete">Delete</button>
+            <button class="btn ghost btn-logs">Logs</button>
           </div>`;
+        // attach event listeners
+        c.querySelector('.btn-start').onclick = ()=>fetch(`/api/${b.id}/start`,{method:'POST'}).then(()=>loadBots());
+        c.querySelector('.btn-stop').onclick = ()=>fetch(`/api/${b.id}/stop`,{method:'POST'}).then(()=>loadBots());
+        c.querySelector('.btn-restart').onclick = ()=>fetch(`/api/${b.id}/restart`,{method:'POST'}).then(()=>loadBots());
+        c.querySelector('.btn-update').onclick = ()=>fetch(`/api/${b.id}/update`,{method:'POST'}).then(()=>loadBots());
+        c.querySelector('.btn-delete').onclick = ()=>fetch(`/api/${b.id}/delete`,{method:'DELETE'}).then(()=>loadBots());
+        c.querySelector('.btn-logs').onclick = ()=>{ openModal(b.id,b.name); location.hash = `bot-${b.id}`; };
         cards.appendChild(c);
       });
     }
@@ -320,13 +328,22 @@
       modalTitle.textContent='Server Console — '+name;
       modalMeta.textContent='attached: '+name;
       modalLog.textContent='Loading logs...';
-      socket.emit('subscribe',id);
+      // ask server to add socket to room
+      socket.emit('attachConsole', id);
+      // server will send initLogs
+      // also fetch last logs as fallback (in case)
       fetch('/api/'+id+'/logs')
         .then(r=>r.json())
-        .then(j=>{modalLog.textContent=(j.logs||[]).join('');});
+        .then(j=>{ if(!attachedId) return; modalLog.textContent = (j.logs||[]).join(''); modalLog.scrollTop = modalLog.scrollHeight; });
     }
 
-    function closeModal(){modal.classList.remove('show');attachedId=null;}
+    function closeModal(){
+      if(attachedId) socket.emit('detachConsole', attachedId);
+      modal.classList.remove('show');
+      attachedId=null;
+      // clear URL hash when closing
+      if(location.hash && location.hash.startsWith('#bot-')) history.replaceState(null, '', location.pathname + location.search);
+    }
     modalClose.onclick=closeModal;
     modalCopy.onclick=async()=>{
       await navigator.clipboard.writeText(modalLog.textContent);
@@ -340,6 +357,12 @@
       if(attachedId===id){
         modalLog.textContent+=text;
         modalLog.scrollTop=modalLog.scrollHeight;
+      }
+    });
+    socket.on('initLogs',(txt)=>{
+      if(attachedId){
+        modalLog.textContent = txt || '';
+        modalLog.scrollTop = modalLog.scrollHeight;
       }
     });
 
@@ -376,14 +399,41 @@
     }
 
     function loadBots(){
-      fetch('/api/bots')
+      return fetch('/api/bots')
         .then(r=>r.json())
         .then(renderCards)
         .then(updateInfo);
     }
 
-    loadBots();
+    // --- INIT ---
+    // show servers by default so visiting root or refreshing shows the server panel
+    showSection('servers');
+
+    // handle URL hash for auto-opening a bot's console: #bot-<id>
+    function checkHashOnLoad(){
+      if(location.hash && location.hash.startsWith('#bot-')){
+        const id = location.hash.replace('#bot-','');
+        // wait a bit for bots list to render, then open modal if id exists
+        setTimeout(()=>{
+          const found = bots.find(b=>b.id===id);
+          if(found){
+            openModal(found.id, found.name);
+          }
+        }, 400);
+      }
+    }
+
+    // load and then check hash
+    loadBots().then(checkHashOnLoad);
+
+    // keep host info updated
     setInterval(updateInfo,5000);
+
+    // clean up socket room join on disconnect (optional)
+    window.addEventListener('beforeunload', ()=>{
+      if(attachedId) socket.emit('detachConsole', attachedId);
+    });
+
   })();
   </script>
 </body>
