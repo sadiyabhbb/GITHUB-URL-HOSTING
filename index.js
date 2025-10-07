@@ -39,7 +39,7 @@ function appendLog(id, chunk) {
   console.log(`[${bot.name}] ${txt.trim()}`);
 }
 
-function emitBots(socket = null) {
+function emitBots() {
   const list = Array.from(bots.values()).map(b => ({
     id: b.id,
     name: b.name,
@@ -49,8 +49,7 @@ function emitBots(socket = null) {
     startTime: b.startTime || null,
     dir: b.dir
   }));
-  if (socket) socket.emit("bots", list);
-  else io.emit("bots", list);
+  io.emit("bots", list);
 }
 
 function startBot(id) {
@@ -91,6 +90,8 @@ function startBot(id) {
     }
   });
 }
+
+// ---------- API ROUTES ---------- //
 
 app.post("/api/deploy", async (req, res) => {
   try {
@@ -265,33 +266,37 @@ app.get("/api/:id/logs", (req, res) => {
 
 app.get("/api/host", (req, res) => {
   res.json({
-    host: {
-      platform: os.platform(),
-      arch: os.arch(),
-      node: process.version,
-      cwd: process.cwd(),
-      cpus: os.cpus().length,
-      memory: { total: os.totalmem(), free: os.freemem() },
-    },
+    platform: os.platform(),
+    arch: os.arch(),
+    node: process.version,
+    cwd: process.cwd(),
+    cpus: os.cpus().length,
+    memory: { total: os.totalmem(), free: os.freemem() },
     uptime: os.uptime(),
     bots: bots.size,
   });
 });
 
-// ✅ FIXED SOCKET.IO CONNECTION
+// ✅ SOCKET FIXES
 io.on("connection", (socket) => {
-  emitBots(socket);
+  const list = Array.from(bots.values()).map((b) => ({
+    id: b.id,
+    name: b.name,
+    repoUrl: b.repoUrl,
+    entry: b.entry,
+    status: b.status,
+    startTime: b.startTime || null,
+    dir: b.dir,
+  }));
+  socket.emit("bots", list);
 
-  // auto send host info to client
-  socket.emit("hostInfo", {
-    host: {
-      platform: os.platform(),
-      arch: os.arch(),
-      node: process.version,
-      cwd: process.cwd(),
-      cpus: os.cpus().length,
-      memory: { total: os.totalmem(), free: os.freemem() },
-    },
+  socket.emit("host", {
+    platform: os.platform(),
+    arch: os.arch(),
+    node: process.version,
+    cwd: process.cwd(),
+    cpus: os.cpus().length,
+    memory: { total: os.totalmem(), free: os.freemem() },
     uptime: os.uptime(),
     bots: bots.size,
   });
@@ -303,7 +308,9 @@ io.on("connection", (socket) => {
     socket.emit("initLogs", bot.logs.join(""));
   });
 
-  socket.on("detachConsole", (id) => socket.leave(id));
+  socket.on("detachConsole", (id) => {
+    socket.leave(id);
+  });
 });
 
 app.get("/", (req, res) =>
@@ -312,5 +319,5 @@ app.get("/", (req, res) =>
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () =>
-  console.log(`Xavia Panel v4.7 running on port ${PORT}`)
+  console.log(`HEADSHOT PANEL v4.6 running on port ${PORT}`)
 );
