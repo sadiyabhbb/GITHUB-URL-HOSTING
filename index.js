@@ -280,7 +280,21 @@ app.get("/api/host", (req, res) => {
 
 // ✅ FIXED SOCKET.IO CONNECTION
 io.on("connection", (socket) => {
-  emitBots(socket); // send immediately
+  emitBots(socket);
+
+  // auto send host info to client
+  socket.emit("hostInfo", {
+    host: {
+      platform: os.platform(),
+      arch: os.arch(),
+      node: process.version,
+      cwd: process.cwd(),
+      cpus: os.cpus().length,
+      memory: { total: os.totalmem(), free: os.freemem() },
+    },
+    uptime: os.uptime(),
+    bots: bots.size,
+  });
 
   socket.on("attachConsole", (id) => {
     const bot = bots.get(id);
@@ -290,21 +304,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("detachConsole", (id) => socket.leave(id));
-
-  socket.on("getHostInfo", () => {
-    socket.emit("hostInfo", {
-      host: {
-        platform: os.platform(),
-        arch: os.arch(),
-        node: process.version,
-        cwd: process.cwd(),
-        cpus: os.cpus().length,
-        memory: { total: os.totalmem(), free: os.freemem() },
-      },
-      uptime: os.uptime(),
-      bots: bots.size,
-    });
-  });
 });
 
 app.get("/", (req, res) =>
