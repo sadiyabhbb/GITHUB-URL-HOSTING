@@ -35,8 +35,7 @@ function appendLog(id, chunk) {
   const txt = cleanAnsi(String(chunk));
   bot.logs.push(txt);
   if (bot.logs.length > 5000) bot.logs.splice(0, bot.logs.length - 5000);
-  io.to(id).emit("log", { id, text: txt });
-  io.emit("globalLog", { id, text: txt });
+  io.to(id).emit("log", { id, text: txt }); // send only to attached console
   console.log(`[${bot.name}] ${txt.trim()}`);
 }
 
@@ -66,16 +65,20 @@ function startBot(id) {
   }
 
   appendLog(id, `🚀 Starting: node ${entry}\n`);
-  const proc = spawn("node", [entry], { cwd: bot.dir, shell: true, env: { ...process.env } });
+  const proc = spawn("node", [entry], {
+    cwd: bot.dir,
+    shell: true,
+    env: { ...process.env },
+  });
   bot.proc = proc;
   bot.status = "running";
   bot.startTime = Date.now();
   emitBots();
 
-  proc.stdout.on("data", d => appendLog(id, d));
-  proc.stderr.on("data", d => appendLog(id, d));
+  proc.stdout.on("data", (d) => appendLog(id, d));
+  proc.stderr.on("data", (d) => appendLog(id, d));
 
-  proc.on("close", code => {
+  proc.on("close", (code) => {
     appendLog(id, `⚠️ Bot exited (code=${code})\n`);
     bot.proc = null;
     bot.status = "stopped";
@@ -95,12 +98,21 @@ app.post("/api/deploy", async (req, res) => {
 
     const safeName = (name && name.trim())
       ? name.trim().replace(/\s+/g, "-")
-      : path.basename(repoUrl).replace(/\.git$/, '') + "-" + uuidv4().slice(0, 6);
+      : path.basename(repoUrl).replace(/\.git$/, "") + "-" + uuidv4().slice(0, 6);
 
     const appDir = path.join(APPS_DIR, safeName);
     const id = uuidv4();
 
-    bots.set(id, { id, name: safeName, repoUrl, dir: appDir, entry, proc: null, logs: [], status: "cloning" });
+    bots.set(id, {
+      id,
+      name: safeName,
+      repoUrl,
+      dir: appDir,
+      entry,
+      proc: null,
+      logs: [],
+      status: "cloning",
+    });
     emitBots();
     appendLog(id, `📦 Cloning ${repoUrl} -> ${appDir}\n`);
 
@@ -123,10 +135,15 @@ app.post("/api/deploy", async (req, res) => {
     emitBots();
     appendLog(id, `📦 Running npm install\n`);
     await new Promise((resolve, reject) => {
-      const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], { cwd: appDir, shell: true });
-      npm.stdout.on("data", d => appendLog(id, d));
-      npm.stderr.on("data", d => appendLog(id, d));
-      npm.on("close", code => code === 0 ? resolve() : reject(new Error("npm install failed: " + code)));
+      const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], {
+        cwd: appDir,
+        shell: true,
+      });
+      npm.stdout.on("data", (d) => appendLog(id, d));
+      npm.stderr.on("data", (d) => appendLog(id, d));
+      npm.on("close", (code) =>
+        code === 0 ? resolve() : reject(new Error("npm install failed: " + code))
+      );
     });
 
     bots.get(id).status = "stopped";
@@ -156,10 +173,15 @@ app.post("/api/:id/update", async (req, res) => {
 
     appendLog(id, `📦 Running npm install\n`);
     await new Promise((resolve, reject) => {
-      const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], { cwd: bot.dir, shell: true });
-      npm.stdout.on("data", d => appendLog(id, d));
-      npm.stderr.on("data", d => appendLog(id, d));
-      npm.on("close", code => code === 0 ? resolve() : reject(new Error("npm install failed: " + code)));
+      const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], {
+        cwd: bot.dir,
+        shell: true,
+      });
+      npm.stdout.on("data", (d) => appendLog(id, d));
+      npm.stderr.on("data", (d) => appendLog(id, d));
+      npm.on("close", (code) =>
+        code === 0 ? resolve() : reject(new Error("npm install failed: " + code))
+      );
     });
 
     appendLog(id, `♻️ Restarting in 2s\n`);
@@ -177,31 +199,41 @@ app.post("/api/:id/update", async (req, res) => {
   }
 });
 
-app.post("/api/:id/start", (req, res) => { startBot(req.params.id); res.json({ message: "starting" }); });
+app.post("/api/:id/start", (req, res) => {
+  startBot(req.params.id);
+  res.json({ message: "starting" });
+});
+
 app.post("/api/:id/stop", (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   if (bot.proc) bot.proc.kill();
-  bot.proc = null; bot.status = "stopped"; delete bot.startTime;
+  bot.proc = null;
+  bot.status = "stopped";
+  delete bot.startTime;
   emitBots();
   appendLog(req.params.id, "🛑 Stopped manually\n");
   res.json({ message: "stopped" });
 });
+
 app.post("/api/:id/restart", (req, res) => {
-  const id = req.params.id; const bot = bots.get(id);
+  const id = req.params.id;
+  const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   if (bot.proc) bot.proc.kill();
   appendLog(id, "🔁 Manual restart\n");
   setTimeout(() => startBot(id), 1500);
   res.json({ message: "restarting" });
 });
+
 app.delete("/api/:id/delete", (req, res) => {
   const id = req.params.id;
   const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   try {
     if (bot.proc) bot.proc.kill();
-    if (fs.existsSync(bot.dir)) fs.rmSync(bot.dir, { recursive: true, force: true });
+    if (fs.existsSync(bot.dir))
+      fs.rmSync(bot.dir, { recursive: true, force: true });
     bots.delete(id);
     emitBots();
     appendLog(id, "🗑️ Bot removed\n");
@@ -212,9 +244,14 @@ app.delete("/api/:id/delete", (req, res) => {
 });
 
 app.get("/api/bots", (req, res) => {
-  const list = Array.from(bots.values()).map(b => ({
-    id: b.id, name: b.name, repoUrl: b.repoUrl, entry: b.entry,
-    status: b.status, startTime: b.startTime || null, dir: b.dir
+  const list = Array.from(bots.values()).map((b) => ({
+    id: b.id,
+    name: b.name,
+    repoUrl: b.repoUrl,
+    entry: b.entry,
+    status: b.status,
+    startTime: b.startTime || null,
+    dir: b.dir,
   }));
   res.json(list);
 });
@@ -233,24 +270,41 @@ app.get("/api/host", (req, res) => {
     cwd: process.cwd(),
     cpus: os.cpus().length,
     memory: { total: os.totalmem(), free: os.freemem() },
-    bots: bots.size
+    uptime: os.uptime(),
+    bots: bots.size,
   });
 });
 
-io.on("connection", socket => {
-  const list = Array.from(bots.values()).map(b => ({
-    id: b.id, name: b.name, repoUrl: b.repoUrl, entry: b.entry, status: b.status, startTime: b.startTime || null, dir: b.dir
+// socket.io
+io.on("connection", (socket) => {
+  const list = Array.from(bots.values()).map((b) => ({
+    id: b.id,
+    name: b.name,
+    repoUrl: b.repoUrl,
+    entry: b.entry,
+    status: b.status,
+    startTime: b.startTime || null,
+    dir: b.dir,
   }));
   socket.emit("bots", list);
-  socket.on("subscribe", id => {
+
+  socket.on("attachConsole", (id) => {
     const bot = bots.get(id);
     if (!bot) return socket.emit("error", "bot not found");
     socket.join(id);
-    socket.emit("init", bot.logs.join(""));
+    socket.emit("initLogs", bot.logs.join(""));
+  });
+
+  socket.on("detachConsole", (id) => {
+    socket.leave(id);
   });
 });
 
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
+app.get("/", (req, res) =>
+  res.sendFile(path.join(__dirname, "public", "index.html"))
+);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`HEADSHOT PANEL v4.6 running on port ${PORT}`));
+server.listen(PORT, () =>
+  console.log(`HEADSHOT PANEL v4.6 running on port ${PORT}`)
+);
