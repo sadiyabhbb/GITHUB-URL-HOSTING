@@ -314,19 +314,27 @@
       });
     }
 
+    // ✅ Fixed socket event (attach/detach)
     function openModal(id,name){
       attachedId=id;
       modal.classList.add('show');
       modalTitle.textContent='Server Console — '+name;
       modalMeta.textContent='attached: '+name;
       modalLog.textContent='Loading logs...';
-      socket.emit('subscribe',id);
+      socket.emit('attachConsole', id); // fixed
       fetch('/api/'+id+'/logs')
         .then(r=>r.json())
         .then(j=>{modalLog.textContent=(j.logs||[]).join('');});
     }
 
-    function closeModal(){modal.classList.remove('show');attachedId=null;}
+    function closeModal(){
+      modal.classList.remove('show');
+      if(attachedId){
+        socket.emit('detachConsole', attachedId); // fixed
+        attachedId=null;
+      }
+    }
+
     modalClose.onclick=closeModal;
     modalCopy.onclick=async()=>{
       await navigator.clipboard.writeText(modalLog.textContent);
@@ -382,7 +390,12 @@
         .then(updateInfo);
     }
 
-    // 🟢 Fix: Auto host info update at page load
+    // ✅ Auto host info load after socket ready
+    socket.on("connect", ()=>{
+      updateInfo();
+      loadBots();
+    });
+
     updateInfo();
     loadBots();
     setInterval(updateInfo,5000);
