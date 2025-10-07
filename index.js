@@ -34,7 +34,7 @@ function appendLog(id, chunk) {
   const txt = cleanAnsi(String(chunk));
   bot.logs.push(txt);
   if (bot.logs.length > 5000) bot.logs.splice(0, bot.logs.length - 5000);
-  io.to(id).emit("log", txt);
+  io.to(id).emit("log", { id, text: txt });
   io.emit("globalLog", { id, text: txt });
   console.log(`[${bot.name}] ${txt.trim()}`);
 }
@@ -56,12 +56,12 @@ function startBot(id) {
   const entry = bot.entry || "index.js";
   const entryPath = path.join(bot.dir, entry);
   if (!fs.existsSync(entryPath)) {
-    appendLog(id, `❌ Entry not found: ${entry}\n`);
+    appendLog(id, `Entry not found: ${entry}\n`);
     bot.status = "error";
     emitBots();
     return;
   }
-  appendLog(id, `🚀 Starting: node ${entry}\n`);
+  appendLog(id, `Starting: node ${entry}\n`);
   const proc = spawn("node", [entry], { cwd: bot.dir, shell: true, env: { ...process.env } });
   bot.proc = proc;
   bot.status = "running";
@@ -72,13 +72,13 @@ function startBot(id) {
   proc.stderr.on("data", d => appendLog(id, d));
 
   proc.on("close", code => {
-    appendLog(id, `⚠️ Bot exited (code=${code})\n`);
+    appendLog(id, `Bot exited (code=${code})\n`);
     bot.proc = null;
     bot.status = "stopped";
     delete bot.startTime;
     emitBots();
     if (code !== 0) {
-      appendLog(id, "♻️ Auto-restart in 5s...\n");
+      appendLog(id, "Auto-restart in 5s\n");
       setTimeout(() => startBot(id), 5000);
     }
   });
@@ -98,7 +98,7 @@ app.post("/api/deploy", async (req, res) => {
 
     bots.set(id, { id, name: safeName, repoUrl, dir: appDir, entry, proc: null, logs: [], status: "cloning" });
     emitBots();
-    appendLog(id, `🌀 Cloning ${repoUrl} -> ${appDir}\n`);
+    appendLog(id, `Cloning ${repoUrl} -> ${appDir}\n`);
 
     const git = simpleGit();
 
@@ -109,15 +109,15 @@ app.post("/api/deploy", async (req, res) => {
     if (fs.existsSync(appDir) && fs.existsSync(path.join(appDir, ".git"))) {
       await git.cwd(appDir);
       await git.pull();
-      appendLog(id, `🔄 Pulled existing repo\n`);
+      appendLog(id, `Pulled existing repo\n`);
     } else {
       await git.clone(repoUrl, appDir);
-      appendLog(id, `✅ Clone finished\n`);
+      appendLog(id, `Clone finished\n`);
     }
 
     bots.get(id).status = "installing";
     emitBots();
-    appendLog(id, `📦 npm install ...\n`);
+    appendLog(id, `Running npm install\n`);
     await new Promise((resolve, reject) => {
       const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], { cwd: appDir, shell: true });
       npm.stdout.on("data", d => appendLog(id, d));
@@ -127,7 +127,7 @@ app.post("/api/deploy", async (req, res) => {
 
     bots.get(id).status = "stopped";
     emitBots();
-    appendLog(id, `✅ Install done — starting in 2s...\n`);
+    appendLog(id, `Install done, starting in 2s\n`);
     setTimeout(() => startBot(id), 2000);
     res.json({ id, name: safeName, dir: appDir });
   } catch (err) {
@@ -142,15 +142,15 @@ app.post("/api/:id/update", async (req, res) => {
   if (!bot) return res.status(404).json({ error: "bot not found" });
 
   try {
-    appendLog(id, `🔁 Updating: git pull in ${bot.dir}\n`);
+    appendLog(id, `Updating: git pull in ${bot.dir}\n`);
     bot.status = "updating";
     emitBots();
 
     const git = simpleGit(bot.dir);
     await git.pull();
-    appendLog(id, `✅ Git pull complete\n`);
+    appendLog(id, `Git pull complete\n`);
 
-    appendLog(id, `📦 npm install (after pull)...\n`);
+    appendLog(id, `Running npm install\n`);
     await new Promise((resolve, reject) => {
       const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], { cwd: bot.dir, shell: true });
       npm.stdout.on("data", d => appendLog(id, d));
@@ -158,7 +158,7 @@ app.post("/api/:id/update", async (req, res) => {
       npm.on("close", code => code === 0 ? resolve() : reject(new Error("npm install failed: " + code)));
     });
 
-    appendLog(id, `🔁 Restarting in 2s...\n`);
+    appendLog(id, `Restarting in 2s\n`);
     if (bot.proc) bot.proc.kill();
     bot.proc = null;
     bot.status = "stopped";
@@ -166,7 +166,7 @@ app.post("/api/:id/update", async (req, res) => {
     setTimeout(() => startBot(id), 2000);
     res.json({ message: "updated" });
   } catch (err) {
-    appendLog(id, `❌ Update failed: ${err.message}\n`);
+    appendLog(id, `Update failed: ${err.message}\n`);
     bot.status = "stopped";
     emitBots();
     res.status(500).json({ error: String(err) });
@@ -180,14 +180,14 @@ app.post("/api/:id/stop", (req, res) => {
   if (bot.proc) bot.proc.kill();
   bot.proc = null; bot.status = "stopped"; delete bot.startTime;
   emitBots();
-  appendLog(req.params.id, "🛑 Stopped manually\n");
+  appendLog(req.params.id, "Stopped manually\n");
   res.json({ message: "stopped" });
 });
 app.post("/api/:id/restart", (req, res) => {
   const id = req.params.id; const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   if (bot.proc) bot.proc.kill();
-  appendLog(id, "🔁 Manual restart...\n");
+  appendLog(id, "Manual restart\n");
   setTimeout(() => startBot(id), 1500);
   res.json({ message: "restarting" });
 });
@@ -200,7 +200,7 @@ app.delete("/api/:id/delete", (req, res) => {
     if (fs.existsSync(bot.dir)) fs.rmSync(bot.dir, { recursive: true, force: true });
     bots.delete(id);
     emitBots();
-    appendLog(id, "🗑 Bot removed\n");
+    appendLog(id, "Bot removed\n");
     res.json({ message: "deleted" });
   } catch (err) {
     res.status(500).json({ error: String(err) });
@@ -233,8 +233,7 @@ app.get("/api/host", (req, res) => {
 
 io.on("connection", socket => {
   const list = Array.from(bots.values()).map(b => ({
-    id: b.id, name: b.name, repoUrl: b.repoUrl, entry: b.entry,
-    status: b.status, startTime: b.startTime || null, dir: b.dir
+    id: b.id, name: b.name, repoUrl: b.repoUrl, entry: b.entry, status: b.status, startTime: b.startTime || null, dir: b.dir
   }));
   socket.emit("bots", list);
 
@@ -249,4 +248,4 @@ io.on("connection", socket => {
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ HEADSHOT PANEL v4.0 running on port ${PORT}`));
+server.listen(PORT, () => console.log(`HEADSHOT PANEL running on port ${PORT}`));
