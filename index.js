@@ -84,10 +84,6 @@ function startBot(id) {
     bot.status = "stopped";
     delete bot.startTime;
     emitBots();
-    if (code !== 0) {
-      appendLog(id, "🔁 Auto-restart in 5s\n");
-      setTimeout(() => startBot(id), 5000);
-    }
   });
 }
 
@@ -118,18 +114,9 @@ app.post("/api/deploy", async (req, res) => {
 
     const git = simpleGit();
 
-    if (fs.existsSync(appDir) && !fs.existsSync(path.join(appDir, ".git"))) {
-      fs.rmSync(appDir, { recursive: true, force: true });
-    }
-
-    if (fs.existsSync(appDir) && fs.existsSync(path.join(appDir, ".git"))) {
-      await git.cwd(appDir);
-      await git.pull();
-      appendLog(id, `🔄 Pulled existing repo\n`);
-    } else {
-      await git.clone(repoUrl, appDir);
-      appendLog(id, `✅ Clone finished\n`);
-    }
+    if (fs.existsSync(appDir)) fs.rmSync(appDir, { recursive: true, force: true });
+    await git.clone(repoUrl, appDir);
+    appendLog(id, `✅ Clone finished\n`);
 
     bots.get(id).status = "installing";
     emitBots();
@@ -148,8 +135,8 @@ app.post("/api/deploy", async (req, res) => {
 
     bots.get(id).status = "stopped";
     emitBots();
-    appendLog(id, `✅ Install done, starting in 2s\n`);
-    setTimeout(() => startBot(id), 2000);
+    appendLog(id, `✅ Install done, starting bot\n`);
+    startBot(id);
     res.json({ id, name: safeName, dir: appDir });
   } catch (err) {
     console.error(err);
@@ -157,94 +144,8 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
-app.post("/api/:id/update", async (req, res) => {
-  const id = req.params.id;
-  const bot = bots.get(id);
-  if (!bot) return res.status(404).json({ error: "bot not found" });
-
-  try {
-    appendLog(id, `🔄 Updating: git pull in ${bot.dir}\n`);
-    bot.status = "updating";
-    emitBots();
-
-    const git = simpleGit(bot.dir);
-    await git.pull();
-    appendLog(id, `✅ Git pull complete\n`);
-
-    appendLog(id, `📦 Running npm install\n`);
-    await new Promise((resolve, reject) => {
-      const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], {
-        cwd: bot.dir,
-        shell: true,
-      });
-      npm.stdout.on("data", (d) => appendLog(id, d));
-      npm.stderr.on("data", (d) => appendLog(id, d));
-      npm.on("close", (code) =>
-        code === 0 ? resolve() : reject(new Error("npm install failed: " + code))
-      );
-    });
-
-    appendLog(id, `♻️ Restarting in 2s\n`);
-    if (bot.proc) bot.proc.kill();
-    bot.proc = null;
-    bot.status = "stopped";
-    emitBots();
-    setTimeout(() => startBot(id), 2000);
-    res.json({ message: "updated" });
-  } catch (err) {
-    appendLog(id, `❌ Update failed: ${err.message}\n`);
-    bot.status = "stopped";
-    emitBots();
-    res.status(500).json({ error: String(err) });
-  }
-});
-
-app.post("/api/:id/start", (req, res) => {
-  startBot(req.params.id);
-  res.json({ message: "starting" });
-});
-
-app.post("/api/:id/stop", (req, res) => {
-  const bot = bots.get(req.params.id);
-  if (!bot) return res.status(404).json({ error: "bot not found" });
-  if (bot.proc) bot.proc.kill();
-  bot.proc = null;
-  bot.status = "stopped";
-  delete bot.startTime;
-  emitBots();
-  appendLog(req.params.id, "🛑 Stopped manually\n");
-  res.json({ message: "stopped" });
-});
-
-app.post("/api/:id/restart", (req, res) => {
-  const id = req.params.id;
-  const bot = bots.get(id);
-  if (!bot) return res.status(404).json({ error: "bot not found" });
-  if (bot.proc) bot.proc.kill();
-  appendLog(id, "🔁 Manual restart\n");
-  setTimeout(() => startBot(id), 1500);
-  res.json({ message: "restarting" });
-});
-
-app.delete("/api/:id/delete", (req, res) => {
-  const id = req.params.id;
-  const bot = bots.get(id);
-  if (!bot) return res.status(404).json({ error: "bot not found" });
-  try {
-    if (bot.proc) bot.proc.kill();
-    if (fs.existsSync(bot.dir))
-      fs.rmSync(bot.dir, { recursive: true, force: true });
-    bots.delete(id);
-    emitBots();
-    appendLog(id, "🗑️ Bot removed\n");
-    res.json({ message: "deleted" });
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
-  }
-});
-
 app.get("/api/bots", (req, res) => {
-  const list = Array.from(bots.values()).map((b) => ({
+  const list = Array.from(bots.values()).map(b => ({
     id: b.id,
     name: b.name,
     repoUrl: b.repoUrl,
@@ -259,7 +160,7 @@ app.get("/api/bots", (req, res) => {
 app.get("/api/:id/logs", (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
-  res.json({ logs: bot.logs.slice(-2000) });
+  res.json({ logs: bot.logs.slice(-1000) });
 });
 
 app.get("/api/host", (req, res) => {
@@ -267,46 +168,26 @@ app.get("/api/host", (req, res) => {
     platform: os.platform(),
     arch: os.arch(),
     node: process.version,
-    cwd: process.cwd(),
     cpus: os.cpus().length,
-    memory: { total: os.totalmem(), free: os.freemem() },
+    memory: (os.totalmem() / 1024 / 1024 / 1024).toFixed(1) + " GB",
     uptime: os.uptime(),
     bots: bots.size,
   });
 });
 
-// socket.io fixed events
 io.on("connection", (socket) => {
-  const list = Array.from(bots.values()).map((b) => ({
-    id: b.id,
-    name: b.name,
-    repoUrl: b.repoUrl,
-    entry: b.entry,
-    status: b.status,
-    startTime: b.startTime || null,
-    dir: b.dir,
-  }));
-  socket.emit("bots", list);
-
+  socket.emit("bots", Array.from(bots.values()));
   socket.on("subscribe", (id) => {
-    const bot = bots.get(id);
-    if (!bot) return socket.emit("error", "bot not found");
     socket.join(id);
-    socket.emit("log", { id, text: bot.logs.join("") });
+    const bot = bots.get(id);
+    if (bot) socket.emit("log", { id, text: bot.logs.join("") });
   });
-
-  socket.on("unsubscribe", (id) => {
-    socket.leave(id);
-  });
+  socket.on("unsubscribe", (id) => socket.leave(id));
 });
 
-// serve panel always for any route except /api/*
 app.get("*", (req, res) => {
-  if (req.path.startsWith("/api")) return res.status(404).json({ error: "Not found" });
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () =>
-  console.log(`🚀 Xavia Panel v4.7 running on port ${PORT}`)
-);
+server.listen(PORT, () => console.log(`🚀 Xavia Panel running on port ${PORT}`));
