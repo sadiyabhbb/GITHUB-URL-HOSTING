@@ -35,7 +35,7 @@ function appendLog(id, chunk) {
   const txt = cleanAnsi(String(chunk));
   bot.logs.push(txt);
   if (bot.logs.length > 5000) bot.logs.splice(0, bot.logs.length - 5000);
-  io.to(id).emit("log", { id, text: txt }); // send only to attached console
+  io.to(id).emit("log", { id, text: txt });
   console.log(`[${bot.name}] ${txt.trim()}`);
 }
 
@@ -275,7 +275,7 @@ app.get("/api/host", (req, res) => {
   });
 });
 
-// socket.io
+// socket.io fixed events
 io.on("connection", (socket) => {
   const list = Array.from(bots.values()).map((b) => ({
     id: b.id,
@@ -288,23 +288,25 @@ io.on("connection", (socket) => {
   }));
   socket.emit("bots", list);
 
-  socket.on("attachConsole", (id) => {
+  socket.on("subscribe", (id) => {
     const bot = bots.get(id);
     if (!bot) return socket.emit("error", "bot not found");
     socket.join(id);
-    socket.emit("initLogs", bot.logs.join(""));
+    socket.emit("log", { id, text: bot.logs.join("") });
   });
 
-  socket.on("detachConsole", (id) => {
+  socket.on("unsubscribe", (id) => {
     socket.leave(id);
   });
 });
 
-app.get("/", (req, res) =>
-  res.sendFile(path.join(__dirname, "public", "index.html"))
-);
+// serve panel always for any route except /api/*
+app.get("*", (req, res) => {
+  if (req.path.startsWith("/api")) return res.status(404).json({ error: "Not found" });
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () =>
-  console.log(`HEADSHOT PANEL v4.6 running on port ${PORT}`)
+  console.log(`🚀 Xavia Panel v4.7 running on port ${PORT}`)
 );
