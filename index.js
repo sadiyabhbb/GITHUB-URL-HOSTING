@@ -35,11 +35,11 @@ function appendLog(id, chunk) {
   const txt = cleanAnsi(String(chunk));
   bot.logs.push(txt);
   if (bot.logs.length > 5000) bot.logs.splice(0, bot.logs.length - 5000);
-  io.to(id).emit("log", { id, text: txt }); // send only to attached console
+  io.to(id).emit("log", { id, text: txt });
   console.log(`[${bot.name}] ${txt.trim()}`);
 }
 
-function emitBots() {
+function emitBots(socket = null) {
   const list = Array.from(bots.values()).map(b => ({
     id: b.id,
     name: b.name,
@@ -49,7 +49,8 @@ function emitBots() {
     startTime: b.startTime || null,
     dir: b.dir
   }));
-  io.emit("bots", list);
+  if (socket) socket.emit("bots", list);
+  else io.emit("bots", list);
 }
 
 function startBot(id) {
@@ -264,29 +265,22 @@ app.get("/api/:id/logs", (req, res) => {
 
 app.get("/api/host", (req, res) => {
   res.json({
-    platform: os.platform(),
-    arch: os.arch(),
-    node: process.version,
-    cwd: process.cwd(),
-    cpus: os.cpus().length,
-    memory: { total: os.totalmem(), free: os.freemem() },
+    host: {
+      platform: os.platform(),
+      arch: os.arch(),
+      node: process.version,
+      cwd: process.cwd(),
+      cpus: os.cpus().length,
+      memory: { total: os.totalmem(), free: os.freemem() },
+    },
     uptime: os.uptime(),
     bots: bots.size,
   });
 });
 
-// socket.io
+// ✅ FIXED SOCKET.IO CONNECTION
 io.on("connection", (socket) => {
-  const list = Array.from(bots.values()).map((b) => ({
-    id: b.id,
-    name: b.name,
-    repoUrl: b.repoUrl,
-    entry: b.entry,
-    status: b.status,
-    startTime: b.startTime || null,
-    dir: b.dir,
-  }));
-  socket.emit("bots", list);
+  emitBots(socket); // send immediately
 
   socket.on("attachConsole", (id) => {
     const bot = bots.get(id);
@@ -295,8 +289,21 @@ io.on("connection", (socket) => {
     socket.emit("initLogs", bot.logs.join(""));
   });
 
-  socket.on("detachConsole", (id) => {
-    socket.leave(id);
+  socket.on("detachConsole", (id) => socket.leave(id));
+
+  socket.on("getHostInfo", () => {
+    socket.emit("hostInfo", {
+      host: {
+        platform: os.platform(),
+        arch: os.arch(),
+        node: process.version,
+        cwd: process.cwd(),
+        cpus: os.cpus().length,
+        memory: { total: os.totalmem(), free: os.freemem() },
+      },
+      uptime: os.uptime(),
+      bots: bots.size,
+    });
   });
 });
 
@@ -306,5 +313,5 @@ app.get("/", (req, res) =>
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () =>
-  console.log(`HEADSHOT PANEL v4.6 running on port ${PORT}`)
+  console.log(`Xavia Panel v4.7 running on port ${PORT}`)
 );
