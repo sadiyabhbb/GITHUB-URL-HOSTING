@@ -8,159 +8,30 @@
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{
-      background:#0d1117;
-      color:#c9d1d9;
-      font-family:"Fira Code",monospace;
-      display:flex;
-      min-height:100vh;
-      overflow-x:hidden;
-    }
-    #sidebar{
-      width:240px;
-      background:#161b22;
-      border-right:1px solid #30363d;
-      position:fixed;
-      left:-260px;
-      top:0;
-      bottom:0;
-      transition:0.3s;
-      padding:1rem;
-      display:flex;
-      flex-direction:column;
-      gap:1rem;
-      z-index:999;
-    }
+    body{background:#0d1117;color:#c9d1d9;font-family:"Fira Code",monospace;display:flex;min-height:100vh;overflow-x:hidden;}
+    #sidebar{width:240px;background:#161b22;border-right:1px solid #30363d;position:fixed;left:-260px;top:0;bottom:0;transition:0.3s;padding:1rem;display:flex;flex-direction:column;gap:1rem;z-index:999;}
     #sidebar.show{left:0}
-    #overlay{
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,0.6);
-      display:none;
-    }
+    #overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;}
     #overlay.show{display:block;}
-    .btn{
-      background:#238636;
-      color:#fff;
-      padding:0.5rem 1rem;
-      border:none;
-      border-radius:6px;
-      cursor:pointer;
-      font-size:14px;
-      transition:0.2s;
-    }
+    .btn{background:#238636;color:#fff;padding:0.5rem 1rem;border:none;border-radius:6px;cursor:pointer;font-size:14px;transition:0.2s;}
     .btn:hover{background:#2ea043;}
     .btn.ghost{background:transparent;border:1px solid #30363d;}
     .btn.ghost:hover{background:#21262d;}
     .btn.danger{background:#da3633;}
     .btn.danger:hover{background:#f85149;}
-    #main{
-      flex:1;
-      margin-left:0;
-      transition:0.3s;
-      width:100%;
-      padding:1rem;
-    }
-    header{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      background:#161b22;
-      padding:0.8rem 1rem;
-      border-bottom:1px solid #30363d;
-      border-radius:8px;
-    }
-    #menuBtn{
-      background:none;
-      border:none;
-      color:#fff;
-      font-size:20px;
-      cursor:pointer;
-    }
-    #cards{
-      display:grid;
-      grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-      gap:1rem;
-      margin-top:1rem;
-    }
-    .card{
-      background:#161b22;
-      border:1px solid #30363d;
-      border-radius:8px;
-      padding:1rem;
-      display:flex;
-      flex-direction:column;
-      justify-content:space-between;
-      box-shadow:0 0 5px rgba(0,0,0,0.4);
-    }
+    #main{flex:1;margin-left:0;transition:0.3s;width:100%;padding:1rem;}
+    header{display:flex;align-items:center;justify-content:space-between;background:#161b22;padding:0.8rem 1rem;border-bottom:1px solid #30363d;border-radius:8px;}
+    #menuBtn{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;}
+    #cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-top:1rem;}
+    .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1rem;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 0 5px rgba(0,0,0,0.4);}
     .card-head{display:flex;align-items:center;justify-content:space-between;}
     .card-title{font-weight:600;font-size:1rem;color:#58a6ff;}
     .card-sub{font-size:0.85rem;color:#8b949e;}
     .card-actions{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.8rem;}
     #createSection,#serversSection{display:none;margin-top:1rem;}
-    input{
-      width:100%;
-      padding:0.5rem;
-      background:#0d1117;
-      border:1px solid #30363d;
-      border-radius:6px;
-      color:#fff;
-      margin-bottom:0.7rem;
-      font-family:"Fira Code";
-    }
-    #modal{
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,0.8);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      z-index:1000;
-    }
-    #modal.show{display:flex;}
-    .modal-inner{
-      background:#161b22;
-      border:1px solid #30363d;
-      border-radius:8px;
-      width:95%;
-      max-width:900px;
-      height:80%;
-      display:flex;
-      flex-direction:column;
-      padding:1rem;
-    }
-    .modal-head{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      margin-bottom:0.5rem;
-    }
-    #modalLog{
-      flex:1;
-      overflow-y:auto;
-      white-space:pre-wrap;
-      font-size:13px;
-      background:#0d1117;
-      padding:1rem;
-      border-radius:6px;
-      border:1px solid #30363d;
-    }
-    #modalMeta{font-size:12px;color:#8b949e;}
-    .json-box{
-      height:260px;
-      background:#000;
-      border:1px solid #30363d;
-      overflow:auto;
-      padding:0.8rem;
-      border-radius:8px;
-      font-size:14px;
-      white-space:pre-wrap;
-      margin-top:1rem;
-    }
-    @keyframes neon {
-      0%{filter:hue-rotate(0deg);}
-      100%{filter:hue-rotate(360deg);}
-    }
+    input{width:100%;padding:0.5rem;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#fff;margin-bottom:0.7rem;font-family:"Fira Code";}
+    .json-box{height:260px;background:#000;border:1px solid #30363d;overflow:auto;padding:0.8rem;border-radius:8px;font-size:14px;white-space:pre-wrap;margin-top:1rem;}
+    @keyframes neon{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
   </style>
 </head>
 <body>
@@ -183,7 +54,6 @@
       <h3 style="margin-top:1rem;">Server List</h3>
       <div id="serverSummary" style="color:#8b949e;font-size:14px;margin:0.4rem 0;">Loading...</div>
       <div id="cards"></div>
-
       <h3 style="margin-top:2rem;">Host & Config Info</h3>
       <div id="infoBox" class="json-box">Loading host info...</div>
     </section>
@@ -199,23 +69,6 @@
       </div>
     </section>
   </main>
-
-  <div id="modal">
-    <div class="modal-inner">
-      <div class="modal-head">
-        <div>
-          <div id="modalTitle" style="color:#58a6ff;">Console</div>
-          <div id="modalMeta"></div>
-        </div>
-        <div style="display:flex;gap:0.5rem;">
-          <button class="btn ghost" id="modalCopy">Copy</button>
-          <button class="btn ghost" id="modalClear">Clear</button>
-          <button class="btn danger" id="modalClose">Close</button>
-        </div>
-      </div>
-      <pre id="modalLog">Loading...</pre>
-    </div>
-  </div>
 
   <script>
   (function(){
@@ -236,20 +89,13 @@
           name=document.getElementById('name');
     const createBtn=document.getElementById('createBtn'),
           cancelCreate=document.getElementById('cancelCreate');
-    const modal=document.getElementById('modal'),
-          modalLog=document.getElementById('modalLog'),
-          modalTitle=document.getElementById('modalTitle'),
-          modalMeta=document.getElementById('modalMeta');
-    const modalCopy=document.getElementById('modalCopy'),
-          modalClear=document.getElementById('modalClear'),
-          modalClose=document.getElementById('modalClose');
 
-    let attachedId=null,bots=[];
+    let bots=[], activeBotLog=null;
 
     function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
     function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
     menuBtn.onclick=openSidebar;
-    overlay.onclick=()=>{closeSidebar();closeModal();};
+    overlay.onclick=()=>closeSidebar();
     btnServers.onclick=()=>{showSection('servers');closeSidebar();};
     btnCreate.onclick=()=>{showSection('create');closeSidebar();};
     btnRefresh.onclick=()=>{location.reload();};
@@ -260,22 +106,14 @@
     }
 
     async function api(path,method='POST',body){
-      return fetch(path,{
-        method,
-        headers:{'content-type':'application/json'},
-        body:body?JSON.stringify(body):null
-      }).then(r=>r.json());
+      return fetch(path,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):null}).then(r=>r.json());
     }
 
     createBtn.onclick=async()=>{
       if(!repo.value.trim())return;
       createBtn.disabled=true;
       createBtn.textContent='Creating...';
-      await api('/api/deploy','POST',{
-        repoUrl:repo.value.trim(),
-        entry:entry.value.trim()||'index.js',
-        name:name.value.trim()
-      });
+      await api('/api/deploy','POST',{repoUrl:repo.value.trim(),entry:entry.value.trim()||'index.js',name:name.value.trim()});
       repo.value=entry.value=name.value='';
       createBtn.disabled=false;
       createBtn.textContent='Create';
@@ -287,10 +125,7 @@
     function renderCards(list){
       bots=list||[];
       cards.innerHTML='';
-      if(!list.length){
-        serverSummary.textContent='No servers found.';
-        return;
-      }
+      if(!list.length){serverSummary.textContent='No servers found.';return;}
       serverSummary.textContent=`${list.length} total bots • ${list.filter(x=>x.status==='running').length} running`;
       list.forEach(b=>{
         const c=document.createElement('div');c.className='card';
@@ -308,83 +143,57 @@
             <button class="btn ghost" onclick="fetch('/api/${b.id}/restart',{method:'POST'}).then(()=>loadBots())">Restart</button>
             <button class="btn ghost" onclick="fetch('/api/${b.id}/update',{method:'POST'}).then(()=>loadBots())">Update</button>
             <button class="btn danger" onclick="fetch('/api/${b.id}/delete',{method:'DELETE'}).then(()=>loadBots())">Delete</button>
-            <button class="btn ghost" onclick="openModal('${b.id}','${b.name}')">Logs</button>
+            <button class="btn ghost" onclick="showBotLogsInInfoBox('${b.id}','${b.name}')">Logs</button>
           </div>`;
         cards.appendChild(c);
       });
     }
 
-    function openModal(id,name){
-      attachedId=id;
-      modal.classList.add('show');
-      modalTitle.textContent='Server Console — '+name;
-      modalMeta.textContent='attached: '+name;
-      modalLog.textContent='Loading logs...';
+    async function showBotLogsInInfoBox(id,name){
+      activeBotLog=id;
+      infoBox.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h4 style="color:#58a6ff;">${name} — Logs</h4>
+        <button class="btn ghost" onclick="hideBotLogs()">Back to Info</button>
+      </div>
+      <pre id="botLogBox" style="height:200px;overflow:auto;background:#0d1117;padding:10px;border-radius:6px;border:1px solid #30363d;">Loading...</pre>`;
+      const logBox=document.getElementById('botLogBox');
+      fetch('/api/'+id+'/logs').then(r=>r.json()).then(j=>{logBox.textContent=(j.logs||[]).join('');});
       socket.emit('subscribe',id);
-      fetch('/api/'+id+'/logs')
-        .then(r=>r.json())
-        .then(j=>{modalLog.textContent=(j.logs||[]).join('');});
+      socket.on('log',({id:textId,text})=>{
+        if(activeBotLog===textId){
+          logBox.textContent+=text;
+          logBox.scrollTop=logBox.scrollHeight;
+        }
+      });
     }
 
-    function closeModal(){modal.classList.remove('show');attachedId=null;}
-    modalClose.onclick=closeModal;
-    modalCopy.onclick=async()=>{
-      await navigator.clipboard.writeText(modalLog.textContent);
-      modalCopy.textContent='Copied';
-      setTimeout(()=>modalCopy.textContent='Copy',800);
+    window.hideBotLogs=function(){
+      activeBotLog=null;
+      updateInfo();
     };
-    modalClear.onclick=()=>modalLog.textContent='';
-
-    socket.on('bots',renderCards);
-    socket.on('log',({id,text})=>{
-      if(attachedId===id){
-        modalLog.textContent+=text;
-        modalLog.scrollTop=modalLog.scrollHeight;
-      }
-    });
 
     async function updateInfo(){
+      if(activeBotLog)return;
       try{
         const h=await fetch('/api/host').then(r=>r.json());
         const b=await fetch('/api/bots').then(r=>r.json());
-        const obj={
-          host:h,
-          panel:{
-            version:'v4.7',
-            bots_total:b.length,
-            bots_running:b.filter(x=>x.status==='running').length,
-            uptime:uptime()
-          }
-        };
+        const obj={host:h,panel:{version:'v4.7',bots_total:b.length,bots_running:b.filter(x=>x.status==='running').length,uptime:uptime()}};
         const json=JSON.stringify(obj,null,2)
           .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
           .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
           .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
         infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
-      }catch(e){
-        infoBox.textContent='Host info error.';
-      }
+      }catch(e){infoBox.textContent='Host info error.';}
     }
 
     const start=Date.now();
-    function uptime(){
-      let t=Math.floor((Date.now()-start)/1000),
-          h=Math.floor(t/3600),
-          m=Math.floor((t%3600)/60),
-          s=t%60;
-      return `${h}h ${m}m ${s}s`;
-    }
+    function uptime(){let t=Math.floor((Date.now()-start)/1000),h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;return `${h}h ${m}m ${s}s`;}
 
-    function loadBots(){
-      fetch('/api/bots')
-        .then(r=>r.json())
-        .then(renderCards)
-        .then(updateInfo);
-    }
+    function loadBots(){fetch('/api/bots').then(r=>r.json()).then(renderCards).then(updateInfo);}
 
     loadBots();
     setInterval(updateInfo,5000);
-    showSection('servers'); // ✅ এখন ডিফল্টভাবে Servers পেজই খুলবে
+    showSection('servers');
   })();
   </script>
 </body>
