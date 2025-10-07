@@ -1,155 +1,390 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Xavia Panel v4.7</title>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <style>
-    body {
-      font-family: "Fira Code", monospace;
-      background-color: #0e0e0e;
-      color: #ddd;
-      margin: 0;
-      padding: 0;
-      overflow-x: hidden;
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      background:#0d1117;
+      color:#c9d1d9;
+      font-family:"Fira Code",monospace;
+      display:flex;
+      min-height:100vh;
+      overflow-x:hidden;
     }
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #161616;
-      padding: 10px 20px;
-      font-size: 18px;
-      color: #ccc;
-      box-shadow: 0 0 8px #000;
+    #sidebar{
+      width:240px;
+      background:#161b22;
+      border-right:1px solid #30363d;
+      position:fixed;
+      left:-260px;
+      top:0;
+      bottom:0;
+      transition:0.3s;
+      padding:1rem;
+      display:flex;
+      flex-direction:column;
+      gap:1rem;
+      z-index:999;
     }
-    .tab {
-      cursor: pointer;
-      margin: 0 10px;
-      padding: 5px 10px;
-      border-radius: 8px;
-      transition: background 0.3s;
+    #sidebar.show{left:0}
+    #overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.6);
+      display:none;
     }
-    .tab:hover, .active {
-      background: #333;
+    #overlay.show{display:block;}
+    .btn{
+      background:#238636;
+      color:#fff;
+      padding:0.5rem 1rem;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:14px;
+      transition:0.2s;
     }
-    .content {
-      padding: 15px;
-      animation: fadeIn 0.4s ease;
+    .btn:hover{background:#2ea043;}
+    .btn.ghost{background:transparent;border:1px solid #30363d;}
+    .btn.ghost:hover{background:#21262d;}
+    .btn.danger{background:#da3633;}
+    .btn.danger:hover{background:#f85149;}
+    #main{
+      flex:1;
+      margin-left:0;
+      transition:0.3s;
+      width:100%;
+      padding:1rem;
     }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      background:#161b22;
+      padding:0.8rem 1rem;
+      border-bottom:1px solid #30363d;
+      border-radius:8px;
     }
-    .card {
-      background: #1b1b1b;
-      padding: 15px;
-      border-radius: 10px;
-      margin-top: 10px;
-      box-shadow: 0 0 8px #000;
+    #menuBtn{
+      background:none;
+      border:none;
+      color:#fff;
+      font-size:20px;
+      cursor:pointer;
     }
-    pre {
-      background: #0d0d0d;
-      color: #00ff90;
-      padding: 10px;
-      border-radius: 8px;
-      height: 300px;
-      overflow-y: auto;
+    #cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+      gap:1rem;
+      margin-top:1rem;
     }
-    button {
-      background: #333;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 5px 10px;
-      cursor: pointer;
-      transition: background 0.3s;
+    .card{
+      background:#161b22;
+      border:1px solid #30363d;
+      border-radius:8px;
+      padding:1rem;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      box-shadow:0 0 5px rgba(0,0,0,0.4);
     }
-    button:hover { background: #555; }
+    .card-head{display:flex;align-items:center;justify-content:space-between;}
+    .card-title{font-weight:600;font-size:1rem;color:#58a6ff;}
+    .card-sub{font-size:0.85rem;color:#8b949e;}
+    .card-actions{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.8rem;}
+    #createSection,#serversSection{display:none;margin-top:1rem;}
+    input{
+      width:100%;
+      padding:0.5rem;
+      background:#0d1117;
+      border:1px solid #30363d;
+      border-radius:6px;
+      color:#fff;
+      margin-bottom:0.7rem;
+      font-family:"Fira Code";
+    }
+    #modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.8);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:1000;
+    }
+    #modal.show{display:flex;}
+    .modal-inner{
+      background:#161b22;
+      border:1px solid #30363d;
+      border-radius:8px;
+      width:95%;
+      max-width:900px;
+      height:80%;
+      display:flex;
+      flex-direction:column;
+      padding:1rem;
+    }
+    .modal-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:0.5rem;
+    }
+    #modalLog{
+      flex:1;
+      overflow-y:auto;
+      white-space:pre-wrap;
+      font-size:13px;
+      background:#0d1117;
+      padding:1rem;
+      border-radius:6px;
+      border:1px solid #30363d;
+    }
+    #modalMeta{font-size:12px;color:#8b949e;}
+    .json-box{
+      height:260px;
+      background:#000;
+      border:1px solid #30363d;
+      overflow:auto;
+      padding:0.8rem;
+      border-radius:8px;
+      font-size:14px;
+      white-space:pre-wrap;
+      margin-top:1rem;
+    }
+    @keyframes neon {
+      0%{filter:hue-rotate(0deg);}
+      100%{filter:hue-rotate(360deg);}
+    }
   </style>
 </head>
 <body>
-  <header>
-    <div>
-      <span class="tab active" id="menu-control">Xavia Control</span>
-      <span class="tab" id="menu-logs">Logs</span>
-      <span class="tab" id="menu-info">Host Info</span>
+  <div id="overlay"></div>
+
+  <aside id="sidebar">
+    <h2 style="color:#58a6ff;">Xavia Panel</h2>
+    <button class="btn" id="btnServers">Servers</button>
+    <button class="btn" id="btnCreate">Create Bot</button>
+    <button class="btn ghost" id="btnRefresh">Refresh</button>
+  </aside>
+
+  <main id="main">
+    <header>
+      <button id="menuBtn">☰</button>
+      <h2>Xavia Control</h2>
+    </header>
+
+    <section id="serversSection">
+      <h3 style="margin-top:1rem;">Server List</h3>
+      <div id="serverSummary" style="color:#8b949e;font-size:14px;margin:0.4rem 0;">Loading...</div>
+      <div id="cards"></div>
+
+      <h3 style="margin-top:2rem;">Host & Config Info</h3>
+      <div id="infoBox" class="json-box">Loading host info...</div>
+    </section>
+
+    <section id="createSection">
+      <h3 style="margin-top:1rem;">Create New Bot</h3>
+      <input id="repo" placeholder="Repository URL (e.g. https://github.com/user/repo.git)" />
+      <input id="entry" placeholder="Entry File (default: index.js)" />
+      <input id="name" placeholder="Bot Name (optional)" />
+      <div style="display:flex;gap:0.5rem;">
+        <button class="btn" id="createBtn">Create</button>
+        <button class="btn ghost" id="cancelCreate">Cancel</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal">
+    <div class="modal-inner">
+      <div class="modal-head">
+        <div>
+          <div id="modalTitle" style="color:#58a6ff;">Console</div>
+          <div id="modalMeta"></div>
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn ghost" id="modalCopy">Copy</button>
+          <button class="btn ghost" id="modalClear">Clear</button>
+          <button class="btn danger" id="modalClose">Close</button>
+        </div>
+      </div>
+      <pre id="modalLog">Loading...</pre>
     </div>
-    <div>Xavia Panel v4.7</div>
-  </header>
-
-  <div class="content" id="control">
-    <div class="card">📦 No bots yet. Deploy to start.</div>
-  </div>
-
-  <div class="content" id="logs" style="display:none;">
-    <div class="card"><pre id="logBox">Waiting for logs...</pre></div>
-  </div>
-
-  <div class="content" id="info" style="display:none;">
-    <div class="card" id="hostInfo">Loading...</div>
   </div>
 
   <script>
+  (function(){
     const socket = io();
-    const logBox = document.getElementById("logBox");
-    let activeBot = null;
+    const cards = document.getElementById('cards');
+    const infoBox = document.getElementById('infoBox');
+    const serverSummary = document.getElementById('serverSummary');
+    const menuBtn=document.getElementById('menuBtn'),
+          sidebar=document.getElementById('sidebar'),
+          overlay=document.getElementById('overlay');
+    const btnServers=document.getElementById('btnServers'),
+          btnCreate=document.getElementById('btnCreate'),
+          btnRefresh=document.getElementById('btnRefresh');
+    const createSection=document.getElementById('createSection'),
+          serversSection=document.getElementById('serversSection');
+    const repo=document.getElementById('repo'),
+          entry=document.getElementById('entry'),
+          name=document.getElementById('name');
+    const createBtn=document.getElementById('createBtn'),
+          cancelCreate=document.getElementById('cancelCreate');
+    const modal=document.getElementById('modal'),
+          modalLog=document.getElementById('modalLog'),
+          modalTitle=document.getElementById('modalTitle'),
+          modalMeta=document.getElementById('modalMeta');
+    const modalCopy=document.getElementById('modalCopy'),
+          modalClear=document.getElementById('modalClear'),
+          modalClose=document.getElementById('modalClose');
 
-    socket.on("bots", (bots) => {
-      const c = document.getElementById("control");
-      c.innerHTML = bots.length ? "" : "<div class='card'>📦 No bots yet.</div>";
-      bots.forEach(bot => {
-        const el = document.createElement("div");
-        el.className = "card";
-        el.innerHTML = `
-          <b>${bot.name}</b> [${bot.status}]<br>
-          <button onclick="viewLogs('${bot.id}')">View Logs</button>
-        `;
-        c.appendChild(el);
+    let attachedId=null,bots=[];
+
+    function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
+    function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
+    menuBtn.onclick=openSidebar;
+    overlay.onclick=()=>{closeSidebar();closeModal();};
+    btnServers.onclick=()=>{showSection('servers');closeSidebar();};
+    btnCreate.onclick=()=>{showSection('create');closeSidebar();};
+    btnRefresh.onclick=()=>{location.reload();};
+
+    function showSection(n){
+      createSection.style.display=(n==='create'?'block':'none');
+      serversSection.style.display=(n==='create'?'none':'block');
+    }
+
+    async function api(path,method='POST',body){
+      return fetch(path,{
+        method,
+        headers:{'content-type':'application/json'},
+        body:body?JSON.stringify(body):null
+      }).then(r=>r.json());
+    }
+
+    createBtn.onclick=async()=>{
+      if(!repo.value.trim())return;
+      createBtn.disabled=true;
+      createBtn.textContent='Creating...';
+      await api('/api/deploy','POST',{
+        repoUrl:repo.value.trim(),
+        entry:entry.value.trim()||'index.js',
+        name:name.value.trim()
       });
-    });
+      repo.value=entry.value=name.value='';
+      createBtn.disabled=false;
+      createBtn.textContent='Create';
+      showSection('servers');
+      loadBots();
+    };
+    cancelCreate.onclick=()=>showSection('servers');
 
-    socket.on("log", ({ id, text }) => {
-      if (activeBot === id) {
-        logBox.textContent += text;
-        logBox.scrollTop = logBox.scrollHeight;
+    function renderCards(list){
+      bots=list||[];
+      cards.innerHTML='';
+      if(!list.length){
+        serverSummary.textContent='No servers found.';
+        return;
+      }
+      serverSummary.textContent=`${list.length} total bots • ${list.filter(x=>x.status==='running').length} running`;
+      list.forEach(b=>{
+        const c=document.createElement('div');c.className='card';
+        c.innerHTML=`
+          <div class="card-head">
+            <div>
+              <div class="card-title">${b.name}</div>
+              <div class="card-sub">${b.entry}</div>
+            </div>
+            <div class="meta">${b.status}</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn ghost" onclick="fetch('/api/${b.id}/start',{method:'POST'}).then(()=>loadBots())">Start</button>
+            <button class="btn ghost" onclick="fetch('/api/${b.id}/stop',{method:'POST'}).then(()=>loadBots())">Stop</button>
+            <button class="btn ghost" onclick="fetch('/api/${b.id}/restart',{method:'POST'}).then(()=>loadBots())">Restart</button>
+            <button class="btn ghost" onclick="fetch('/api/${b.id}/update',{method:'POST'}).then(()=>loadBots())">Update</button>
+            <button class="btn danger" onclick="fetch('/api/${b.id}/delete',{method:'DELETE'}).then(()=>loadBots())">Delete</button>
+            <button class="btn ghost" onclick="openModal('${b.id}','${b.name}')">Logs</button>
+          </div>`;
+        cards.appendChild(c);
+      });
+    }
+
+    function openModal(id,name){
+      attachedId=id;
+      modal.classList.add('show');
+      modalTitle.textContent='Server Console — '+name;
+      modalMeta.textContent='attached: '+name;
+      modalLog.textContent='Loading logs...';
+      socket.emit('subscribe',id);
+      fetch('/api/'+id+'/logs')
+        .then(r=>r.json())
+        .then(j=>{modalLog.textContent=(j.logs||[]).join('');});
+    }
+
+    function closeModal(){modal.classList.remove('show');attachedId=null;}
+    modalClose.onclick=closeModal;
+    modalCopy.onclick=async()=>{
+      await navigator.clipboard.writeText(modalLog.textContent);
+      modalCopy.textContent='Copied';
+      setTimeout(()=>modalCopy.textContent='Copy',800);
+    };
+    modalClear.onclick=()=>modalLog.textContent='';
+
+    socket.on('bots',renderCards);
+    socket.on('log',({id,text})=>{
+      if(attachedId===id){
+        modalLog.textContent+=text;
+        modalLog.scrollTop=modalLog.scrollHeight;
       }
     });
 
-    async function viewLogs(id) {
-      activeBot = id;
-      document.getElementById("menu-logs").click();
-      logBox.textContent = "Fetching logs...";
-      const res = await fetch(`/api/${id}/logs`);
-      const data = await res.json();
-      logBox.textContent = data.logs.join("") || "No logs yet.";
-      socket.emit("subscribe", id);
+    async function updateInfo(){
+      try{
+        const h=await fetch('/api/host').then(r=>r.json());
+        const b=await fetch('/api/bots').then(r=>r.json());
+        const obj={
+          host:h,
+          panel:{
+            version:'v4.7',
+            bots_total:b.length,
+            bots_running:b.filter(x=>x.status==='running').length,
+            uptime:uptime()
+          }
+        };
+        const json=JSON.stringify(obj,null,2)
+          .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
+          .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
+          .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
+        infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
+      }catch(e){
+        infoBox.textContent='Host info error.';
+      }
     }
 
-    document.getElementById("menu-control").onclick = () => showTab("control");
-    document.getElementById("menu-logs").onclick = () => showTab("logs");
-    document.getElementById("menu-info").onclick = () => showTab("info");
-
-    function showTab(tab) {
-      ["control","logs","info"].forEach(t=>{
-        document.getElementById(t).style.display = t===tab?"block":"none";
-        document.getElementById("menu-"+t).classList.toggle("active", t===tab);
-      });
+    const start=Date.now();
+    function uptime(){
+      let t=Math.floor((Date.now()-start)/1000),
+          h=Math.floor(t/3600),
+          m=Math.floor((t%3600)/60),
+          s=t%60;
+      return `${h}h ${m}m ${s}s`;
     }
 
-    async function loadHost() {
-      const res = await fetch("/api/host");
-      const data = await res.json();
-      document.getElementById("hostInfo").innerHTML = `
-        <b>Platform:</b> ${data.platform}<br>
-        <b>CPU:</b> ${data.cpus}<br>
-        <b>RAM:</b> ${data.memory}<br>
-        <b>Bots:</b> ${data.bots}<br>
-        <b>Node:</b> ${data.node}<br>
-      `;
+    function loadBots(){
+      fetch('/api/bots')
+        .then(r=>r.json())
+        .then(renderCards)
+        .then(updateInfo);
     }
-    loadHost();
+
+    loadBots();
+    setInterval(updateInfo,5000);
+  })();
   </script>
 </body>
 </html>
