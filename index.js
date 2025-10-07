@@ -1,4 +1,4 @@
-// server.js
+// index.js
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -199,7 +199,7 @@ app.get("/api/:id/logs", (req, res) => {
   res.json({ logs: bot.logs.slice(-2000) });
 });
 
-// 💻 Host info
+// 💻 Host info (must come before catch-all)
 app.get("/api/host", (req, res) => {
   res.json({
     os: os.platform(),
@@ -214,6 +214,11 @@ app.get("/api/host", (req, res) => {
   });
 });
 
+// ⚠️ Catch-all route for frontend (last)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 // 🔌 Socket.io events
 io.on("connection", (socket) => {
   socket.emit("bots", Array.from(bots.values()));
@@ -226,12 +231,8 @@ io.on("connection", (socket) => {
   socket.on("detachConsole", (id) => socket.leave(id));
 });
 
-// 🏠 Always open main panel first
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
+// 🚀 Server start
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () =>
-  console.log(`🚀 XAVIA PANEL v4.7 running at http://localhost:${PORT}`)
-);
+server.listen(PORT, () => {
+  console.log(`🚀 XAVIA PANEL v4.7 running at http://localhost:${PORT}`);
+});
