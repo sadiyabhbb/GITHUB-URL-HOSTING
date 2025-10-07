@@ -1,207 +1,349 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LIKHON HEADSHOT PANEL v3.9</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HEADSHOT PANEL v4.0</title>
+
+  <!-- If you have xnil font file, place it in public/fonts and uncomment below -->
+  <!--
   <style>
-    :root {
-      --bg: #0d1117;
-      --card: #161b22;
-      --accent: #00ffc3;
-      --accent2: #00b4ff;
-      --text: #e6edf3;
-      --danger: #ff4d4d;
+    @font-face {
+      font-family: "XnilCustom";
+      src: url("/fonts/xnil.ttf") format("truetype");
+      font-weight: 600;
     }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: "Poppins", sans-serif;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
+  </style>
+  -->
+
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#0f1418;
+      --card:#11161a;
+      --muted:#9aa6b2;
+      --accent:#00ffd1;
+      --accent-2:#00b3ff;
+      --danger:#ff5b5b;
+      --brand-font: system-ui, "Poppins", "Inter", sans-serif; /* change to 'XnilCustom' if available */
     }
-    header {
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      color: #000;
-      text-align: center;
-      padding: 12px;
-      font-weight: 800;
-      font-size: 1.3em;
-      letter-spacing: 1px;
-      text-shadow: 0 0 10px #00ffe0;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#071018,#0b0f14);
+      color:#e6f0f2;
+      font-family:var(--brand-font);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding:12px;
     }
-    main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 10px;
-      overflow: hidden;
-    }
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    input {
-      background: var(--card);
-      border: 1px solid #222;
-      color: var(--text);
-      padding: 10px;
-      border-radius: 8px;
-      flex: 1;
-      min-width: 200px;
-    }
-    button {
-      background: linear-gradient(135deg, var(--accent2), var(--accent));
-      color: #000;
-      border: none;
-      padding: 10px 18px;
-      font-weight: bold;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-    button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 10px var(--accent);
-    }
-    .bots {
-      flex: 1;
-      overflow-y: auto;
-      display: grid;
-      gap: 10px;
-    }
-    .bot {
-      background: var(--card);
-      border-radius: 12px;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      box-shadow: 0 0 5px #000;
-    }
-    .bot-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .bot-name {
-      font-weight: bold;
-      color: var(--accent);
-    }
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .delete-btn {
-      background: var(--danger);
-      color: #fff;
-    }
-    .console {
-      background: #000;
-      color: #00ff88;
-      font-family: monospace;
-      font-size: 13px;
-      border-radius: 8px;
-      padding: 10px;
-      height: 200px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      border: 1px solid #333;
-      margin-top: 10px;
+
+    /* header */
+    header{ display:flex; align-items:center; justify-content:space-between; gap:12px; max-width:1100px; margin:0 auto 12px; }
+    .brand { display:flex; flex-direction:column; }
+    .brand h1{ margin:0; color:var(--accent); font-size:18px; letter-spacing:0.6px; font-weight:700; }
+    .brand small{ color:var(--muted); font-size:12px; }
+
+    .menu-btn { background:transparent;border:1px solid rgba(255,255,255,0.03); padding:8px; border-radius:8px; color:var(--muted); cursor:pointer; }
+
+    .top-row { max-width:1100px; margin:0 auto 10px; display:flex; gap:12px; align-items:center; justify-content:space-between; }
+
+    /* layout */
+    .layout { max-width:1100px; margin:0 auto; display:grid; grid-template-columns: 1fr 420px; gap:14px; align-items:start; }
+    @media(max-width:960px){ .layout{ grid-template-columns:1fr; } }
+
+    /* left panel (cards) */
+    .left-panel { background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:14px; border:1px solid rgba(255,255,255,0.02); }
+    .deploy { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+    .deploy input{ background:var(--card); border:1px solid #152025; color:var(--muted); padding:10px; border-radius:8px; min-width:0; flex:1; }
+    .deploy button{ background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:#001; border:none; padding:10px 12px; border-radius:8px; cursor:pointer; font-weight:700; }
+
+    .cards { display:flex; flex-direction:column; gap:10px; max-height:65vh; overflow:auto; padding-right:6px; }
+    .card { background:var(--panel); border-radius:10px; padding:12px; border:1px solid rgba(255,255,255,0.02); }
+    .card-head { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+    .card-title { font-weight:700; color:var(--accent); }
+    .meta { color:var(--muted); font-size:13px; }
+
+    .card-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .btn { padding:8px 10px; border-radius:8px; border:none; cursor:pointer; font-weight:700; background:#0a0f12; color:var(--accent); }
+    .btn.ghost { background:transparent; border:1px solid rgba(255,255,255,0.03); color:var(--muted); }
+    .btn.danger { background:var(--danger); color:#fff; border:none; }
+
+    /* logs area (right) */
+    .right-panel { background:var(--panel); border-radius:12px; padding:12px; border:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:10px; }
+    .host-info { background:linear-gradient(90deg, rgba(0,255,209,0.03), rgba(0,179,255,0.02)); padding:10px; border-radius:8px; font-size:13px; color:var(--muted); }
+    .log-container { background:#000; color:#fff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace; font-size:13px; padding:12px; border-radius:8px; height:420px; overflow:auto; white-space:pre-wrap; border:1px solid rgba(255,255,255,0.03); }
+    .log-controls { display:flex; gap:8px; align-items:center; justify-content:space-between; }
+
+    .small { font-size:13px; color:var(--muted); }
+
+    /* expandable console per card */
+    .card-log { background:#050608; color:#dfffe6; font-family:monospace; padding:10px; border-radius:8px; max-height:0; overflow:hidden; transition: max-height 300ms ease; white-space:pre-wrap; border:1px solid rgba(255,255,255,0.02); margin-top:10px; }
+    .card.expanded .card-log { max-height:320px; }
+
+    @media(max-width:600px){
+      .log-container{height:320px}
+      .card.expanded .card-log { max-height:260px; }
     }
   </style>
 </head>
 <body>
-  <header>⚡ LIKHON HEADSHOT PANEL v3.9 ⚡</header>
-  <main>
-    <div class="controls">
-      <input id="repoUrl" placeholder="Enter GitHub repo URL..." />
-      <input id="name" placeholder="Bot name..." />
-      <button onclick="deploy()">🚀 Deploy</button>
+  <header>
+    <div class="brand">
+      <h1>HEADSHOT PANEL</h1>
+      <small class="small">v4.0 • Dark Neon • Stable</small>
     </div>
-    <div class="bots" id="bots"></div>
-    <div class="console" id="console">🟢 Live logs will appear here...</div>
-  </main>
+    <div>
+      <button id="menuBtn" class="menu-btn">☰</button>
+    </div>
+  </header>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    const botsDiv = document.getElementById("bots");
-    const consoleDiv = document.getElementById("console");
+  <div class="top-row" style="max-width:1100px; margin:0 auto 8px;">
+    <div class="small">Manage bots — deploy, update, start/stop, view logs & host info</div>
+    <div id="statusSummary" class="small">Loading...</div>
+  </div>
 
-    socket.on("log", (msg) => {
-      consoleDiv.textContent += msg;
-      consoleDiv.scrollTop = consoleDiv.scrollHeight;
+  <div class="layout">
+    <!-- LEFT -->
+    <section class="left-panel">
+      <div class="deploy">
+        <input id="repo" placeholder="Git repo URL (https://github.com/user/repo.git)">
+        <input id="entry" placeholder="entry (index.js)" style="max-width:160px">
+        <input id="bname" placeholder="Bot name (optional)" style="max-width:200px">
+        <button id="deployBtn">Deploy</button>
+      </div>
+
+      <div class="cards" id="cards">
+        <!-- cards injected here -->
+      </div>
+    </section>
+
+    <!-- RIGHT -->
+    <aside class="right-panel">
+      <div class="host-info" id="hostInfo">Host info loading...</div>
+
+      <div class="log-controls">
+        <div>
+          <button id="copyAll" class="btn ghost">Copy Logs</button>
+          <button id="clearAll" class="btn ghost">Clear</button>
+        </div>
+        <div class="small" id="attachedInfo">No bot attached</div>
+      </div>
+
+      <div id="globalLog" class="log-container">No logs yet. Attach a bot from a card to view live logs.</div>
+    </aside>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(async function(){
+  const socket = io();
+  let bots = [];
+  let attachedId = null;
+  const cardsEl = document.getElementById('cards');
+  const globalLog = document.getElementById('globalLog');
+  const attachedInfo = document.getElementById('attachedInfo');
+  const statusSummary = document.getElementById('statusSummary');
+
+  // helpers
+  function elt(tag, html){ const e = document.createElement(tag); if (html) e.innerHTML = html; return e; }
+  function fmtUptime(ms){
+    if(!ms) return '-';
+    const s=Math.floor(ms/1000), d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60), sec=s%60;
+    if(d) return `${d}d ${h}h ${m}m`;
+    if(h) return `${h}h ${m}m ${sec}s`;
+    if(m) return `${m}m ${sec}s`;
+    return `${sec}s`;
+  }
+  function updateSummary(){
+    const running = bots.filter(b=>b.status==='running').length;
+    const stopped = bots.length - running;
+    statusSummary.textContent = `${running} running • ${stopped} stopped • ${bots.length} total`;
+  }
+
+  // fetch host info
+  async function loadHost(){
+    try{
+      const r = await fetch('/api/host'); const j = await r.json();
+      document.getElementById('hostInfo').innerHTML = `
+        <div><strong>Node:</strong> ${j.node} • <strong>Platform:</strong> ${j.platform}/${j.arch}</div>
+        <div style="margin-top:6px"><strong>CWD:</strong> ${j.cwd}</div>
+        <div style="margin-top:6px"><strong>CPUs:</strong> ${j.cpus} • <strong>Bots:</strong> ${j.bots}</div>
+      `;
+    }catch(e){ console.error(e); }
+  }
+
+  // render cards
+  function renderCards(list){
+    bots = list;
+    cardsEl.innerHTML = '';
+    list.forEach(b => {
+      const card = elt('div'); card.className='card'; card.dataset.id=b.id;
+      const statusClass = b.status==='running' ? 'running' : (b.status==='installing' || b.status==='updating' ? 'installing' : 'stopped');
+      const uptime = b.startTime ? fmtUptime(Date.now() - new Date(b.startTime).getTime()) : '-';
+      card.innerHTML = `
+        <div class="card-head">
+          <div>
+            <div class="card-title">${escapeHtml(b.name)}</div>
+            <div class="meta">entry: <strong>${escapeHtml(b.entry||'index.js')}</strong> • repo: <a href="${escapeHtml(b.repoUrl||'#')}" target="_blank" style="color:var(--accent)">${b.repoUrl? '(repo)' : '(no repo)'}</a></div>
+          </div>
+          <div style="text-align:right">
+            <div class="meta">${b.status==='running' ? '<strong style="color:var(--accent)">● running</strong>' : '<span style="color:var(--muted)">● stopped</span>'}</div>
+            <div class="meta">uptime: <strong>${uptime}</strong></div>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button class="btn start">Start</button>
+          <button class="btn ghost stop">Stop</button>
+          <button class="btn ghost restart">Restart</button>
+          <button class="btn ghost update">Update</button>
+          <button class="btn danger delete">Delete</button>
+          <button class="btn ghost logsBtn">Logs</button>
+          <button class="btn ghost copyBtn">Copy</button>
+        </div>
+
+        <div class="card-log" id="log-${b.id}"></div>
+      `;
+
+      // attach listeners
+      card.querySelector('.start').onclick = async ()=>{ await apiPost(`/${b.id}/start`); refresh(); };
+      card.querySelector('.stop').onclick = async ()=>{ await apiPost(`/${b.id}/stop`); refresh(); };
+      card.querySelector('.restart').onclick = async ()=>{ await apiPost(`/${b.id}/restart`); refresh(); };
+      card.querySelector('.update').onclick = async ()=>{ await apiPost(`/${b.id}/update`); refresh(); };
+      card.querySelector('.delete').onclick = async ()=>{
+        if(!confirm('Delete this bot permanently?')) return;
+        await apiDelete(`/${b.id}/delete`); refresh();
+      };
+
+      // Logs button toggles expand and subscribes to socket
+      const logsBtn = card.querySelector('.logsBtn');
+      const logDiv = card.querySelector('.card-log');
+      logsBtn.onclick = async ()=>{
+        const expanded = card.classList.toggle('expanded');
+        if(expanded){
+          // fetch recent logs and subscribe
+          const res = await fetch(`/api/${b.id}/logs`); const d = await res.json();
+          logDiv.textContent = (d.logs||[]).join('');
+          logDiv.scrollTop = logDiv.scrollHeight;
+          socket.emit('subscribe', b.id);
+          attachedId = b.id;
+          attachedInfo.textContent = `Attached: ${b.name}`;
+        } else {
+          // detach (simply keep joined but UI collapse)
+          attachedId = null;
+          attachedInfo.textContent = 'No bot attached';
+        }
+      };
+
+      // copy logs of this card
+      card.querySelector('.copyBtn').onclick = async ()=>{
+        const res = await fetch(`/api/${b.id}/logs`); const d = await res.json();
+        try{ await navigator.clipboard.writeText((d.logs||[]).join('')); alert('Logs copied'); }catch(e){ alert('Copy failed'); }
+      };
+
+      cardsEl.appendChild(card);
     });
 
-    async function loadBots() {
-      const res = await fetch("/api/bots");
-      const bots = await res.json();
-      botsDiv.innerHTML = "";
-      bots.forEach(b => {
-        const el = document.createElement("div");
-        el.className = "bot";
-        el.innerHTML = `
-          <div class="bot-header">
-            <span class="bot-name">${b.name}</span>
-            <span>${b.status === "running" ? "🟢 Running" : "🔴 Stopped"}</span>
-          </div>
-          <div class="actions">
-            <button onclick="start('${b.id}')">▶ Start</button>
-            <button onclick="stop('${b.id}')">⏹ Stop</button>
-            <button onclick="restart('${b.id}')">🔁 Restart</button>
-            <button onclick="updateBot('${b.id}')">⬆️ Update</button>
-            <button class="delete-btn" onclick="deleteBot('${b.id}')">🗑 Delete</button>
-          </div>
-        `;
-        botsDiv.appendChild(el);
-      });
-    }
+    updateSummary();
+  }
 
-    async function deploy() {
-      const repoUrl = document.getElementById("repoUrl").value;
-      const name = document.getElementById("name").value;
-      if (!repoUrl) return alert("Enter a repo URL first!");
-      await fetch("/api/deploy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoUrl, name }),
-      });
-      loadBots();
-    }
+  // escape
+  function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-    async function start(id) {
-      await fetch(`/api/${id}/start`, { method: "POST" });
-      loadBots();
-    }
+  // API helpers
+  async function apiGet(p){ const r = await fetch('/api' + p); return r.json(); }
+  async function apiPost(p, body){ const r = await fetch('/api' + p, { method:'POST', headers:{'content-type':'application/json'}, body: body?JSON.stringify(body):undefined }); return r.json(); }
+  async function apiDelete(p){ const r = await fetch('/api' + p, { method:'DELETE' }); return r.json(); }
 
-    async function stop(id) {
-      await fetch(`/api/${id}/stop`, { method: "POST" });
-      loadBots();
-    }
+  // refresh bots
+  async function refresh(){
+    const list = await apiGet('/bots');
+    renderCards(list);
+    await loadHost();
+  }
 
-    async function restart(id) {
-      await fetch(`/api/${id}/restart`, { method: "POST" });
-      loadBots();
-    }
+  // attach global socket handlers
+  socket.on('connect', ()=> console.log('socket connected'));
+  socket.on('bots', list => { renderCards(list); });
+  socket.on('init', data => { /* per-subscribe init handled by socket server direct to room */ });
+  socket.on('log', txt => {
+    // when receiving room logs, server emits to room; handled by room subscribers automatically (we also listen below)
+  });
+  socket.on('globalLog', (d) => {
+    // append to right-panel global log
+    globalLog.textContent += `[${d.id}] ${d.text}`;
+    globalLog.scrollTop = globalLog.scrollHeight;
+  });
 
-    async function updateBot(id) {
-      await fetch(`/api/${id}/update`, { method: "POST" });
-      loadBots();
+  // subscribe to room messages and append to card logs
+  socket.on('log', (chunk) => {
+    // server might emit both string and {id,text}
+    if(typeof chunk === 'string') {
+      // generic
+      globalLog.textContent += chunk;
+      globalLog.scrollTop = globalLog.scrollHeight;
+    } else if (chunk && chunk.id && chunk.text) {
+      // append to card log if exists
+      const el = document.getElementById('log-' + chunk.id);
+      if (el) {
+        el.textContent += chunk.text;
+        el.scrollTop = el.scrollHeight;
+      }
+      // also global
+      globalLog.textContent += `[${chunk.id}] ${chunk.text}`;
+      globalLog.scrollTop = globalLog.scrollHeight;
     }
+  });
 
-    async function deleteBot(id) {
-      if (!confirm("Delete this bot permanently?")) return;
-      await fetch(`/api/${id}/delete`, { method: "DELETE" });
-      loadBots();
-    }
+  // handle copyAll / clearAll
+  document.getElementById('copyAll').onclick = async ()=>{
+    try{ await navigator.clipboard.writeText(globalLog.textContent); alert('All logs copied'); }catch(e){ alert('Copy failed'); }
+  };
+  document.getElementById('clearAll').onclick = ()=> { globalLog.textContent = ''; };
 
-    loadBots();
-  </script>
+  // deploy button
+  document.getElementById('deployBtn').onclick = async ()=>{
+    const repo = document.getElementById('repo').value.trim();
+    const entry = document.getElementById('entry').value.trim() || 'index.js';
+    const name = document.getElementById('bname').value.trim();
+    if(!repo) return alert('Enter repo URL');
+    document.getElementById('deployBtn').disabled = true;
+    document.getElementById('deployBtn').textContent = 'Deploying...';
+    try{
+      const res = await apiPost('/deploy', { repoUrl: repo, name, entry });
+      if(res.error) alert('Deploy error: ' + res.error);
+      else { alert('Deploy started'); document.getElementById('repo').value=''; document.getElementById('bname').value=''; }
+    }catch(e){ alert('Deploy failed'); }
+    document.getElementById('deployBtn').disabled = false;
+    document.getElementById('deployBtn').textContent = 'Deploy';
+    refresh();
+  };
+
+  // host info loader
+  async function loadHost(){ try{ const j = await apiGet('/host'); document.getElementById('hostInfo').innerHTML = `
+      <div><strong>Node:</strong> ${j.node} • <strong>Platform:</strong> ${j.platform}/${j.arch}</div>
+      <div style="margin-top:6px"><strong>Path:</strong> ${j.cwd}</div>
+      <div style="margin-top:6px"><strong>CPUs:</strong> ${j.cpus} • <strong>Bots:</strong> ${j.bots}</div>
+    `;}catch(e){ console.error(e); } }
+
+  // initial
+  await refresh();
+  await loadHost();
+
+  // periodic uptime refresh
+  setInterval(()=>{ // update uptime text inside cards
+    document.querySelectorAll('.card').forEach(card=>{
+      const id = card.dataset.id;
+      const b = bots.find(x=>x.id===id);
+      if(!b) return;
+      const upEl = card.querySelector('.meta strong') || null;
+      // easiest: re-render bots summary every minute (light)
+    });
+    updateSummary();
+  }, 1000*5);
+
+})();
+</script>
 </body>
 </html>
