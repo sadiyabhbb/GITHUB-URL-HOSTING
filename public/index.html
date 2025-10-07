@@ -9,63 +9,163 @@
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{
-      background:#0d1117;color:#c9d1d9;font-family:"Fira Code",monospace;
-      display:flex;min-height:100vh;overflow-x:hidden;
+      background:#0d1117;
+      color:#c9d1d9;
+      font-family:"Fira Code",monospace;
+      display:flex;
+      min-height:100vh;
+      overflow-x:hidden;
     }
-    #sidebar{width:240px;background:#161b22;border-right:1px solid #30363d;
-      position:fixed;left:-260px;top:0;bottom:0;transition:0.3s;
-      padding:1rem;display:flex;flex-direction:column;gap:1rem;z-index:999;
+    #sidebar{
+      width:240px;
+      background:#161b22;
+      border-right:1px solid #30363d;
+      position:fixed;
+      left:-260px;
+      top:0;
+      bottom:0;
+      transition:0.3s;
+      padding:1rem;
+      display:flex;
+      flex-direction:column;
+      gap:1rem;
+      z-index:999;
     }
     #sidebar.show{left:0}
-    #overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;}
+    #overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.6);
+      display:none;
+    }
     #overlay.show{display:block;}
-    .btn{background:#238636;color:#fff;padding:0.5rem 1rem;border:none;
-      border-radius:6px;cursor:pointer;font-size:14px;transition:0.2s;}
+    .btn{
+      background:#238636;
+      color:#fff;
+      padding:0.5rem 1rem;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:14px;
+      transition:0.2s;
+    }
     .btn:hover{background:#2ea043;}
     .btn.ghost{background:transparent;border:1px solid #30363d;}
     .btn.ghost:hover{background:#21262d;}
     .btn.danger{background:#da3633;}
     .btn.danger:hover{background:#f85149;}
-    #main{flex:1;margin-left:0;transition:0.3s;width:100%;padding:1rem;}
-    header{display:flex;align-items:center;justify-content:space-between;
-      background:#161b22;padding:0.8rem 1rem;border-bottom:1px solid #30363d;
-      border-radius:8px;}
-    #menuBtn{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;}
-    #cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-      gap:1rem;margin-top:1rem;}
-    .card{background:#161b22;border:1px solid #30363d;border-radius:8px;
-      padding:1rem;display:flex;flex-direction:column;justify-content:space-between;
-      box-shadow:0 0 5px rgba(0,0,0,0.4);}
+    #main{
+      flex:1;
+      margin-left:0;
+      transition:0.3s;
+      width:100%;
+      padding:1rem;
+    }
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      background:#161b22;
+      padding:0.8rem 1rem;
+      border-bottom:1px solid #30363d;
+      border-radius:8px;
+    }
+    #menuBtn{
+      background:none;
+      border:none;
+      color:#fff;
+      font-size:20px;
+      cursor:pointer;
+    }
+    #cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+      gap:1rem;
+      margin-top:1rem;
+    }
+    .card{
+      background:#161b22;
+      border:1px solid #30363d;
+      border-radius:8px;
+      padding:1rem;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      box-shadow:0 0 5px rgba(0,0,0,0.4);
+    }
     .card-head{display:flex;align-items:center;justify-content:space-between;}
     .card-title{font-weight:600;font-size:1rem;color:#58a6ff;}
     .card-sub{font-size:0.85rem;color:#8b949e;}
     .card-actions{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.8rem;}
     #createSection,#serversSection{display:none;margin-top:1rem;}
     input{
-      width:100%;padding:0.5rem;background:#0d1117;border:1px solid #30363d;
-      border-radius:6px;color:#fff;margin-bottom:0.7rem;font-family:"Fira Code";
+      width:100%;
+      padding:0.5rem;
+      background:#0d1117;
+      border:1px solid #30363d;
+      border-radius:6px;
+      color:#fff;
+      margin-bottom:0.7rem;
+      font-family:"Fira Code";
     }
     #modal{
-      position:fixed;inset:0;background:rgba(0,0,0,0.8);
-      display:none;align-items:center;justify-content:center;z-index:1000;
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.8);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:1000;
     }
     #modal.show{display:flex;}
     .modal-inner{
-      background:#161b22;border:1px solid #30363d;border-radius:8px;
-      width:95%;max-width:900px;height:80%;display:flex;flex-direction:column;
+      background:#161b22;
+      border:1px solid #30363d;
+      border-radius:8px;
+      width:95%;
+      max-width:900px;
+      height:80%;
+      display:flex;
+      flex-direction:column;
       padding:1rem;
     }
-    .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;}
-    #modalLog{flex:1;overflow-y:auto;white-space:pre-wrap;font-size:13px;
-      background:#0d1117;padding:1rem;border-radius:6px;border:1px solid #30363d;}
+    .modal-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:0.5rem;
+    }
+    #modalLog{
+      flex:1;
+      overflow-y:auto;
+      white-space:pre-wrap;
+      font-size:13px;
+      background:#0d1117;
+      padding:1rem;
+      border-radius:6px;
+      border:1px solid #30363d;
+    }
     #modalMeta{font-size:12px;color:#8b949e;}
-    .json-box{height:280px;background:#000;border:1px solid #30363d;overflow:auto;
-      padding:0.8rem;border-radius:8px;font-size:14px;white-space:pre-wrap;margin-top:1rem;}
-    @keyframes neon{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
+    .json-box{
+      height:260px;
+      background:#000;
+      border:1px solid #30363d;
+      overflow:auto;
+      padding:0.8rem;
+      border-radius:8px;
+      font-size:14px;
+      white-space:pre-wrap;
+      margin-top:1rem;
+    }
+    @keyframes neon {
+      0%{filter:hue-rotate(0deg);}
+      100%{filter:hue-rotate(360deg);}
+    }
   </style>
 </head>
 <body>
   <div id="overlay"></div>
+
   <aside id="sidebar">
     <h2 style="color:#58a6ff;">Xavia Panel</h2>
     <button class="btn" id="btnServers">Servers</button>
@@ -146,14 +246,13 @@
 
     let attachedId=null,bots=[];
 
-    // Sidebar control
     function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
     function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
     menuBtn.onclick=openSidebar;
     overlay.onclick=()=>{closeSidebar();closeModal();};
     btnServers.onclick=()=>{showSection('servers');closeSidebar();};
     btnCreate.onclick=()=>{showSection('create');closeSidebar();};
-    btnRefresh.onclick=()=>{loadBots();closeSidebar();};
+    btnRefresh.onclick=()=>{location.reload();};
 
     function showSection(n){
       createSection.style.display=(n==='create'?'block':'none');
@@ -221,17 +320,13 @@
       modalTitle.textContent='Server Console — '+name;
       modalMeta.textContent='attached: '+name;
       modalLog.textContent='Loading logs...';
-      socket.emit('attachConsole', id);
+      socket.emit('subscribe',id);
+      fetch('/api/'+id+'/logs')
+        .then(r=>r.json())
+        .then(j=>{modalLog.textContent=(j.logs||[]).join('');});
     }
 
-    function closeModal(){
-      modal.classList.remove('show');
-      if(attachedId){
-        socket.emit('detachConsole', attachedId);
-        attachedId=null;
-      }
-    }
-
+    function closeModal(){modal.classList.remove('show');attachedId=null;}
     modalClose.onclick=closeModal;
     modalCopy.onclick=async()=>{
       await navigator.clipboard.writeText(modalLog.textContent);
@@ -240,22 +335,14 @@
     };
     modalClear.onclick=()=>modalLog.textContent='';
 
-    // 🩵 FIXED SOCKET EVENTS
     socket.on('bots',renderCards);
-
-    socket.on('initLogs',txt=>{
-      modalLog.textContent = txt || 'No logs yet...';
-      modalLog.scrollTop = modalLog.scrollHeight;
-    });
-
     socket.on('log',({id,text})=>{
       if(attachedId===id){
-        modalLog.textContent += text;
-        modalLog.scrollTop = modalLog.scrollHeight;
+        modalLog.textContent+=text;
+        modalLog.scrollTop=modalLog.scrollHeight;
       }
     });
 
-    // Host info update
     async function updateInfo(){
       try{
         const h=await fetch('/api/host').then(r=>r.json());
@@ -273,9 +360,9 @@
           .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
           .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
           .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
-        infoBox.innerHTML=`<pre style="margin:0;padding:0;"><div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div></pre>`;
+        infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
       }catch(e){
-        infoBox.textContent='Host info error: '+e.message;
+        infoBox.textContent='Host info error.';
       }
     }
 
@@ -295,13 +382,8 @@
         .then(updateInfo);
     }
 
-    function initApp(){
-      showSection('servers');
-      loadBots();
-      setInterval(updateInfo,5000);
-    }
-
-    initApp();
+    loadBots();
+    setInterval(updateInfo,5000);
   })();
   </script>
 </body>
