@@ -1,231 +1,390 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>HEADSHOT PANEL v4.7</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xavia Panel v4.7</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <style>
-    :root{
-      --bg: #050c12;
-      --panel: #0f1418;
-      --card: #11161a;
-      --muted: #9aa3a9;
-      --accent-a: #00ffd1;
-      --accent-b: #00b3ff;
-      --danger: #ff4b4b;
-      --glass: rgba(255,255,255,0.02);
-      --font: "Inter", system-ui, -apple-system, "Poppins", sans-serif;
-    }
     *{box-sizing:border-box;margin:0;padding:0}
     body{
-      background:linear-gradient(180deg,var(--bg),#071018);
-      color:#eaf2f3;
-      font-family:var(--font);
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
+      background:#0d1117;
+      color:#c9d1d9;
+      font-family:"Fira Code",monospace;
+      display:flex;
+      min-height:100vh;
+      overflow-x:hidden;
     }
-
+    #sidebar{
+      width:240px;
+      background:#161b22;
+      border-right:1px solid #30363d;
+      position:fixed;
+      left:-260px;
+      top:0;
+      bottom:0;
+      transition:0.3s;
+      padding:1rem;
+      display:flex;
+      flex-direction:column;
+      gap:1rem;
+      z-index:999;
+    }
+    #sidebar.show{left:0}
+    #overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.6);
+      display:none;
+    }
+    #overlay.show{display:block;}
+    .btn{
+      background:#238636;
+      color:#fff;
+      padding:0.5rem 1rem;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:14px;
+      transition:0.2s;
+    }
+    .btn:hover{background:#2ea043;}
+    .btn.ghost{background:transparent;border:1px solid #30363d;}
+    .btn.ghost:hover{background:#21262d;}
+    .btn.danger{background:#da3633;}
+    .btn.danger:hover{background:#f85149;}
+    #main{
+      flex:1;
+      margin-left:0;
+      transition:0.3s;
+      width:100%;
+      padding:1rem;
+    }
     header{
-      background:var(--panel);
-      padding:14px 16px;
-      display:flex;align-items:center;justify-content:space-between;
-      border-bottom:1px solid rgba(255,255,255,0.04);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      background:#161b22;
+      padding:0.8rem 1rem;
+      border-bottom:1px solid #30363d;
+      border-radius:8px;
     }
-    .brand h1{margin:0;color:var(--accent-a);font-size:18px}
-    .brand small{color:var(--muted);font-size:12px}
-    .menu-btn{background:transparent;border:none;color:var(--accent-a);font-size:22px;cursor:pointer}
-
-    .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.25s;z-index:80}
-    .overlay.show{opacity:1;pointer-events:auto}
-    .sidebar{position:fixed;left:-260px;top:0;height:100%;width:260px;background:rgba(15,20,24,0.98);
-      padding:28px 16px;display:flex;flex-direction:column;gap:12px;transition:left .28s;z-index:90;border-right:1px solid var(--glass)}
-    .sidebar.show{left:0}
-    .sidebar button{background:transparent;border:none;color:var(--muted);text-align:left;padding:10px;border-radius:8px;cursor:pointer;font-weight:600}
-    .sidebar button:hover{color:var(--accent-a);background:rgba(255,255,255,0.02);transform:translateX(6px);transition:.14s}
-
-    .wrap{max-width:1100px;margin:20px auto;padding:0 14px;display:grid;gap:16px}
-    .panel{background:var(--panel);padding:14px;border-radius:12px;border:1px solid var(--glass);box-shadow:0 8px 30px rgba(0,0,0,0.45)}
-    .title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-    .meta{color:var(--muted);font-size:13px}
-
-    .cards{display:flex;flex-direction:column;gap:12px;max-height:46vh;overflow:auto;padding-right:6px}
-    .card{background:var(--card);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
-    .card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
-    .card-title{color:var(--accent-a);font-weight:800}
-    .card-sub{color:var(--muted);font-size:13px;margin-top:6px}
-    .card-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-    .btn{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;font-weight:700}
-    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
-    .btn.accent{background:linear-gradient(90deg,var(--accent-a),var(--accent-b));color:#001}
-    .btn.danger{background:var(--danger);color:#fff}
-
-    .info-console{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
-      border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.03);
-      font-family:ui-monospace,monospace;font-size:13px}
-    .json-box{background:#000;padding:14px;border-radius:8px;color:#fff;white-space:pre-wrap;overflow:auto;height:150px;border:1px solid rgba(255,255,255,0.03)}
-
-    .neon-text{
-      font-weight:700;
-      background:linear-gradient(90deg,#00ffd1,#00b3ff,#a770ff,#ff7bd1);
-      background-size:300% 100%;
-      -webkit-background-clip:text;
-      color:transparent;
-      animation:neon 6s linear infinite;
+    #menuBtn{
+      background:none;
+      border:none;
+      color:#fff;
+      font-size:20px;
+      cursor:pointer;
     }
-    @keyframes neon{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-
-    .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:200;opacity:0;pointer-events:none;transition:.18s}
-    .modal.show{opacity:1;pointer-events:auto}
-    .modal-card{width:min(980px,96%);max-height:86vh;background:var(--panel);border-radius:12px;padding:12px;border:1px solid var(--glass);display:flex;flex-direction:column}
-    .modal-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:8px}
-    .modal-log{background:#000;color:#e6f0f2;padding:12px;border-radius:8px;overflow:auto;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:13px;flex:1;border:1px solid rgba(255,255,255,0.03)}
-
-    @media(max-width:920px){.json-box{height:120px}}
-    @media(max-width:520px){.json-box{height:100px}.btn{padding:7px 10px;font-size:13px}}
+    #cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+      gap:1rem;
+      margin-top:1rem;
+    }
+    .card{
+      background:#161b22;
+      border:1px solid #30363d;
+      border-radius:8px;
+      padding:1rem;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      box-shadow:0 0 5px rgba(0,0,0,0.4);
+    }
+    .card-head{display:flex;align-items:center;justify-content:space-between;}
+    .card-title{font-weight:600;font-size:1rem;color:#58a6ff;}
+    .card-sub{font-size:0.85rem;color:#8b949e;}
+    .card-actions{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.8rem;}
+    #createSection,#serversSection{display:none;margin-top:1rem;}
+    input{
+      width:100%;
+      padding:0.5rem;
+      background:#0d1117;
+      border:1px solid #30363d;
+      border-radius:6px;
+      color:#fff;
+      margin-bottom:0.7rem;
+      font-family:"Fira Code";
+    }
+    #modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.8);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:1000;
+    }
+    #modal.show{display:flex;}
+    .modal-inner{
+      background:#161b22;
+      border:1px solid #30363d;
+      border-radius:8px;
+      width:95%;
+      max-width:900px;
+      height:80%;
+      display:flex;
+      flex-direction:column;
+      padding:1rem;
+    }
+    .modal-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:0.5rem;
+    }
+    #modalLog{
+      flex:1;
+      overflow-y:auto;
+      white-space:pre-wrap;
+      font-size:13px;
+      background:#0d1117;
+      padding:1rem;
+      border-radius:6px;
+      border:1px solid #30363d;
+    }
+    #modalMeta{font-size:12px;color:#8b949e;}
+    .json-box{
+      height:260px;
+      background:#000;
+      border:1px solid #30363d;
+      overflow:auto;
+      padding:0.8rem;
+      border-radius:8px;
+      font-size:14px;
+      white-space:pre-wrap;
+      margin-top:1rem;
+    }
+    @keyframes neon {
+      0%{filter:hue-rotate(0deg);}
+      100%{filter:hue-rotate(360deg);}
+    }
   </style>
 </head>
 <body>
-<header>
-  <div class="brand">
-    <h1>HEADSHOT PANEL</h1>
-    <small class="meta">v4.7 • Neon Dynamic</small>
+  <div id="overlay"></div>
+
+  <aside id="sidebar">
+    <h2 style="color:#58a6ff;">Xavia Panel</h2>
+    <button class="btn" id="btnServers">Servers</button>
+    <button class="btn" id="btnCreate">Create Bot</button>
+    <button class="btn ghost" id="btnRefresh">Refresh</button>
+  </aside>
+
+  <main id="main">
+    <header>
+      <button id="menuBtn">☰</button>
+      <h2>Xavia Control</h2>
+    </header>
+
+    <section id="serversSection">
+      <h3 style="margin-top:1rem;">Server List</h3>
+      <div id="serverSummary" style="color:#8b949e;font-size:14px;margin:0.4rem 0;">Loading...</div>
+      <div id="cards"></div>
+
+      <h3 style="margin-top:2rem;">Host & Config Info</h3>
+      <div id="infoBox" class="json-box">Loading host info...</div>
+    </section>
+
+    <section id="createSection">
+      <h3 style="margin-top:1rem;">Create New Bot</h3>
+      <input id="repo" placeholder="Repository URL (e.g. https://github.com/user/repo.git)" />
+      <input id="entry" placeholder="Entry File (default: index.js)" />
+      <input id="name" placeholder="Bot Name (optional)" />
+      <div style="display:flex;gap:0.5rem;">
+        <button class="btn" id="createBtn">Create</button>
+        <button class="btn ghost" id="cancelCreate">Cancel</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal">
+    <div class="modal-inner">
+      <div class="modal-head">
+        <div>
+          <div id="modalTitle" style="color:#58a6ff;">Console</div>
+          <div id="modalMeta"></div>
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn ghost" id="modalCopy">Copy</button>
+          <button class="btn ghost" id="modalClear">Clear</button>
+          <button class="btn danger" id="modalClose">Close</button>
+        </div>
+      </div>
+      <pre id="modalLog">Loading...</pre>
+    </div>
   </div>
-  <button id="menuBtn" class="menu-btn">☰</button>
-</header>
 
-<div id="overlay" class="overlay"></div>
-<aside id="sidebar" class="sidebar">
-  <button id="btnServers">Servers</button>
-  <button id="btnCreate">Create Server</button>
-  <button id="btnRefresh">Refresh</button>
-</aside>
+  <script>
+  (function(){
+    const socket = io();
+    const cards = document.getElementById('cards');
+    const infoBox = document.getElementById('infoBox');
+    const serverSummary = document.getElementById('serverSummary');
+    const menuBtn=document.getElementById('menuBtn'),
+          sidebar=document.getElementById('sidebar'),
+          overlay=document.getElementById('overlay');
+    const btnServers=document.getElementById('btnServers'),
+          btnCreate=document.getElementById('btnCreate'),
+          btnRefresh=document.getElementById('btnRefresh');
+    const createSection=document.getElementById('createSection'),
+          serversSection=document.getElementById('serversSection');
+    const repo=document.getElementById('repo'),
+          entry=document.getElementById('entry'),
+          name=document.getElementById('name');
+    const createBtn=document.getElementById('createBtn'),
+          cancelCreate=document.getElementById('cancelCreate');
+    const modal=document.getElementById('modal'),
+          modalLog=document.getElementById('modalLog'),
+          modalTitle=document.getElementById('modalTitle'),
+          modalMeta=document.getElementById('modalMeta');
+    const modalCopy=document.getElementById('modalCopy'),
+          modalClear=document.getElementById('modalClear'),
+          modalClose=document.getElementById('modalClose');
 
-<main class="wrap">
-  <section class="panel" id="serversSection">
-    <div class="title-row">
-      <div>
-        <div style="font-weight:800;color:var(--accent-a)">Servers</div>
-        <div class="meta" id="serverSummary">Loading...</div>
-      </div>
-      <div class="meta" id="runningCount"></div>
-    </div>
-    <div class="cards" id="cards"></div>
-  </section>
+    let attachedId=null,bots=[];
 
-  <section class="panel" id="createSection" style="display:none">
-    <div style="font-weight:800;color:var(--accent-a)">Create Server</div>
-    <div style="height:10px"></div>
-    <input id="repo" placeholder="Git repo URL" class="input">
-    <input id="entry" placeholder="Entry (index.js)" class="input">
-    <input id="name" placeholder="Bot name (optional)" class="input">
-    <div style="display:flex;gap:8px">
-      <button id="createBtn" class="btn accent">Create</button>
-      <button id="cancelCreate" class="btn ghost">Cancel</button>
-    </div>
-  </section>
+    function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
+    function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
+    menuBtn.onclick=openSidebar;
+    overlay.onclick=()=>{closeSidebar();closeModal();};
+    btnServers.onclick=()=>{showSection('servers');closeSidebar();};
+    btnCreate.onclick=()=>{showSection('create');closeSidebar();};
+    btnRefresh.onclick=()=>{location.reload();};
 
-  <section class="panel info-console">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div style="font-weight:800;color:var(--accent-a)">Host & Config Info</div>
-      <div class="meta">Auto info • JSON</div>
-    </div>
-    <div class="json-box" id="infoBox"><span class="neon-text">Loading host info...</span></div>
-  </section>
-</main>
+    function showSection(n){
+      createSection.style.display=(n==='create'?'block':'none');
+      serversSection.style.display=(n==='create'?'none':'block');
+    }
 
-<div id="modal" class="modal">
-  <div class="modal-card">
-    <div class="modal-head">
-      <div>
-        <div id="modalTitle" style="font-weight:800;color:var(--accent-a)">Logs</div>
-        <div id="modalMeta" class="meta">attached: -</div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button id="modalCopy" class="btn ghost">Copy</button>
-        <button id="modalClear" class="btn ghost">Clear</button>
-        <button id="modalClose" class="btn danger">Close</button>
-      </div>
-    </div>
-    <div id="modalLog" class="modal-log">No logs yet. Attach a bot from the list.</div>
-  </div>
-</div>
+    async function api(path,method='POST',body){
+      return fetch(path,{
+        method,
+        headers:{'content-type':'application/json'},
+        body:body?JSON.stringify(body):null
+      }).then(r=>r.json());
+    }
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-(function(){
-  const socket = io();
-  const cards = document.getElementById('cards');
-  const infoBox = document.getElementById('infoBox');
-  const menuBtn=document.getElementById('menuBtn'),sidebar=document.getElementById('sidebar'),overlay=document.getElementById('overlay');
-  const btnServers=document.getElementById('btnServers'),btnCreate=document.getElementById('btnCreate'),btnRefresh=document.getElementById('btnRefresh');
-  const createSection=document.getElementById('createSection'),serversSection=document.getElementById('serversSection');
-  const repo=document.getElementById('repo'),entry=document.getElementById('entry'),name=document.getElementById('name');
-  const createBtn=document.getElementById('createBtn'),cancelCreate=document.getElementById('cancelCreate');
-  const modal=document.getElementById('modal'),modalLog=document.getElementById('modalLog'),modalTitle=document.getElementById('modalTitle'),modalMeta=document.getElementById('modalMeta');
-  const modalCopy=document.getElementById('modalCopy'),modalClear=document.getElementById('modalClear'),modalClose=document.getElementById('modalClose');
-  let attachedId=null,bots=[];
+    createBtn.onclick=async()=>{
+      if(!repo.value.trim())return;
+      createBtn.disabled=true;
+      createBtn.textContent='Creating...';
+      await api('/api/deploy','POST',{
+        repoUrl:repo.value.trim(),
+        entry:entry.value.trim()||'index.js',
+        name:name.value.trim()
+      });
+      repo.value=entry.value=name.value='';
+      createBtn.disabled=false;
+      createBtn.textContent='Create';
+      showSection('servers');
+      loadBots();
+    };
+    cancelCreate.onclick=()=>showSection('servers');
 
-  function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
-  function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
-  menuBtn.onclick=openSidebar;overlay.onclick=()=>{closeSidebar();closeModal();};
-  btnServers.onclick=()=>{showSection('servers');closeSidebar();};
-  btnCreate.onclick=()=>{showSection('create');closeSidebar();};
-  btnRefresh.onclick=()=>{loadBots();closeSidebar();};
+    function renderCards(list){
+      bots=list||[];
+      cards.innerHTML='';
+      if(!list.length){
+        serverSummary.textContent='No servers found.';
+        return;
+      }
+      serverSummary.textContent=`${list.length} total bots • ${list.filter(x=>x.status==='running').length} running`;
+      list.forEach(b=>{
+        const c=document.createElement('div');c.className='card';
+        c.innerHTML=`
+          <div class="card-head">
+            <div>
+              <div class="card-title">${b.name}</div>
+              <div class="card-sub">${b.entry}</div>
+            </div>
+            <div class="meta">${b.status}</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn ghost" onclick="fetch('/api/${b.id}/start',{method:'POST'}).then(()=>loadBots())">Start</button>
+            <button class="btn ghost" onclick="fetch('/api/${b.id}/stop',{method:'POST'}).then(()=>loadBots())">Stop</button>
+            <button class="btn ghost" onclick="fetch('/api/${b.id}/restart',{method:'POST'}).then(()=>loadBots())">Restart</button>
+            <button class="btn ghost" onclick="fetch('/api/${b.id}/update',{method:'POST'}).then(()=>loadBots())">Update</button>
+            <button class="btn danger" onclick="fetch('/api/${b.id}/delete',{method:'DELETE'}).then(()=>loadBots())">Delete</button>
+            <button class="btn ghost" onclick="openModal('${b.id}','${b.name}')">Logs</button>
+          </div>`;
+        cards.appendChild(c);
+      });
+    }
 
-  function showSection(n){createSection.style.display=(n==='create'?'block':'none');serversSection.style.display=(n==='create'?'none':'block');}
-  async function api(path,method='POST',body){return fetch(path,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):null}).then(r=>r.json());}
+    function openModal(id,name){
+      attachedId=id;
+      modal.classList.add('show');
+      modalTitle.textContent='Server Console — '+name;
+      modalMeta.textContent='attached: '+name;
+      modalLog.textContent='Loading logs...';
+      socket.emit('subscribe',id);
+      fetch('/api/'+id+'/logs')
+        .then(r=>r.json())
+        .then(j=>{modalLog.textContent=(j.logs||[]).join('');});
+    }
 
-  createBtn.onclick=async()=>{
-    if(!repo.value.trim())return;
-    createBtn.disabled=true;createBtn.textContent='Creating...';
-    await api('/api/deploy','POST',{repoUrl:repo.value.trim(),entry:entry.value.trim()||'index.js',name:name.value.trim()});
-    repo.value=entry.value=name.value='';createBtn.disabled=false;createBtn.textContent='Create';showSection('servers');loadBots();
-  };
-  cancelCreate.onclick=()=>showSection('servers');
+    function closeModal(){modal.classList.remove('show');attachedId=null;}
+    modalClose.onclick=closeModal;
+    modalCopy.onclick=async()=>{
+      await navigator.clipboard.writeText(modalLog.textContent);
+      modalCopy.textContent='Copied';
+      setTimeout(()=>modalCopy.textContent='Copy',800);
+    };
+    modalClear.onclick=()=>modalLog.textContent='';
 
-  function renderCards(list){
-    bots=list||[];cards.innerHTML='';
-    list.forEach(b=>{
-      const c=document.createElement('div');c.className='card';
-      c.innerHTML=`
-        <div class="card-head"><div><div class="card-title">${b.name}</div><div class="card-sub">${b.entry}</div></div><div class="meta">${b.status}</div></div>
-        <div class="card-actions">
-          <button class="btn ghost" onclick="fetch('/api/${b.id}/start',{method:'POST'}).then(()=>loadBots())">Start</button>
-          <button class="btn ghost" onclick="fetch('/api/${b.id}/stop',{method:'POST'}).then(()=>loadBots())">Stop</button>
-          <button class="btn ghost" onclick="fetch('/api/${b.id}/restart',{method:'POST'}).then(()=>loadBots())">Restart</button>
-          <button class="btn ghost" onclick="fetch('/api/${b.id}/update',{method:'POST'}).then(()=>loadBots())">Update</button>
-          <button class="btn danger" onclick="fetch('/api/${b.id}/delete',{method:'DELETE'}).then(()=>loadBots())">Delete</button>
-          <button class="btn ghost" onclick="openModal('${b.id}','${b.name}')">Logs</button>
-        </div>`;
-      cards.appendChild(c);
+    socket.on('bots',renderCards);
+    socket.on('log',({id,text})=>{
+      if(attachedId===id){
+        modalLog.textContent+=text;
+        modalLog.scrollTop=modalLog.scrollHeight;
+      }
     });
-  }
 
-  function openModal(id,name){attachedId=id;modal.classList.add('show');modalTitle.textContent='Server Console — '+name;modalMeta.textContent='attached: '+name;modalLog.textContent='Loading logs...';socket.emit('subscribe',id);fetch('/api/'+id+'/logs').then(r=>r.json()).then(j=>{modalLog.textContent=(j.logs||[]).join('');});}
-  function closeModal(){modal.classList.remove('show');attachedId=null;}
-  modalClose.onclick=closeModal;
-  modalCopy.onclick=async()=>{await navigator.clipboard.writeText(modalLog.textContent);modalCopy.textContent='Copied';setTimeout(()=>modalCopy.textContent='Copy',800);}
-  modalClear.onclick=()=>modalLog.textContent='';
+    async function updateInfo(){
+      try{
+        const h=await fetch('/api/host').then(r=>r.json());
+        const b=await fetch('/api/bots').then(r=>r.json());
+        const obj={
+          host:h,
+          panel:{
+            version:'v4.7',
+            bots_total:b.length,
+            bots_running:b.filter(x=>x.status==='running').length,
+            uptime:uptime()
+          }
+        };
+        const json=JSON.stringify(obj,null,2)
+          .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
+          .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
+          .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
+        infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
+      }catch(e){
+        infoBox.textContent='Host info error.';
+      }
+    }
 
-  socket.on('bots',renderCards);
-  socket.on('log',({id,text})=>{if(attachedId===id){modalLog.textContent+=text;modalLog.scrollTop=modalLog.scrollHeight;}});
+    const start=Date.now();
+    function uptime(){
+      let t=Math.floor((Date.now()-start)/1000),
+          h=Math.floor(t/3600),
+          m=Math.floor((t%3600)/60),
+          s=t%60;
+      return `${h}h ${m}m ${s}s`;
+    }
 
-  async function updateInfo(){
-    try{
-      const h=await fetch('/api/host').then(r=>r.json());
-      const b=await fetch('/api/bots').then(r=>r.json());
-      const obj={host:h,panel:{version:'v4.7',bots_total:b.length,bots_running:b.filter(x=>x.status==='running').length,uptime:uptime()}};
-      const s=JSON.stringify(obj,null,2).replace(/"([^"]+)":/g,'<span style="color:#7ad1ff">"$1"</span>:').replace(/:\s*"([^"]+)"/g,': <span style="color:#ffd58a">"$1"</span>').replace(/:\s*(\d+)/g,': <span style="color:#8cffb3">$1</span>');
-      infoBox.innerHTML=`<div class="neon-text">${s}</div>`;
-    }catch(e){infoBox.textContent='Host info error.';}
-  }
+    function loadBots(){
+      fetch('/api/bots')
+        .then(r=>r.json())
+        .then(renderCards)
+        .then(updateInfo);
+    }
 
-  const start=Date.now();
-  function uptime(){let t=Math.floor((Date.now()-start)/1000),h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;return `${h}h ${m}m ${s}s`;}
-  function loadBots(){fetch('/api/bots').then(r=>r.json()).then(renderCards).then(updateInfo);}
-  loadBots();setInterval(updateInfo,5000);
-})();
-</script>
+    loadBots();
+    setInterval(updateInfo,5000);
+  })();
+  </script>
 </body>
 </html>
