@@ -1,180 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Xavia Panel v4.7</title>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    * { box-sizing: border-box; }
     body {
-      margin: 0;
       font-family: "Fira Code", monospace;
-      background: #0e0e10;
+      background-color: #0e0e0e;
       color: #ddd;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
     }
     header {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #1c1c1f;
-      padding: 10px 16px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    }
-    header h1 { margin: 0; font-size: 1.2rem; color: #aaa; }
-    .container { padding: 15px; }
-    .host-info, .bot {
-      background: #18181b;
-      border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 15px;
-      box-shadow: 0 0 8px rgba(0,0,0,0.4);
-    }
-    .host-info h2 { margin-top: 0; font-size: 1rem; color: #999; }
-    .bot-header {
-      display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
-    }
-    .bot-name { font-weight: 600; color: #6cf; }
-    button {
-      background: #2d2d33;
+      background: #161616;
+      padding: 10px 20px;
+      font-size: 18px;
       color: #ccc;
+      box-shadow: 0 0 8px #000;
+    }
+    .tab {
+      cursor: pointer;
+      margin: 0 10px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      transition: background 0.3s;
+    }
+    .tab:hover, .active {
+      background: #333;
+    }
+    .content {
+      padding: 15px;
+      animation: fadeIn 0.4s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card {
+      background: #1b1b1b;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 10px;
+      box-shadow: 0 0 8px #000;
+    }
+    pre {
+      background: #0d0d0d;
+      color: #00ff90;
+      padding: 10px;
+      border-radius: 8px;
+      height: 300px;
+      overflow-y: auto;
+    }
+    button {
+      background: #333;
+      color: #fff;
       border: none;
       border-radius: 6px;
       padding: 5px 10px;
       cursor: pointer;
-      transition: all 0.2s;
-      font-family: inherit;
+      transition: background 0.3s;
     }
-    button:hover { background: #444; }
-    button:active { transform: scale(0.95); }
-    .logs-box {
-      background: #111;
-      border-radius: 8px;
-      padding: 10px;
-      height: 300px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      font-size: 0.85rem;
-      animation: fadeIn 0.3s ease;
-    }
-    .hidden { display: none; }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.98); }
-      to { opacity: 1; transform: scale(1); }
-    }
+    button:hover { background: #555; }
   </style>
 </head>
 <body>
   <header>
-    <h1>☰ Xavia Control</h1>
-    <h1>Xavia Panel v4.7</h1>
+    <div>
+      <span class="tab active" id="menu-control">Xavia Control</span>
+      <span class="tab" id="menu-logs">Logs</span>
+      <span class="tab" id="menu-info">Host Info</span>
+    </div>
+    <div>Xavia Panel v4.7</div>
   </header>
 
-  <div class="container">
-    <div id="host" class="host-info">
-      <h2>Host Info</h2>
-      <pre id="hostData">Loading...</pre>
-    </div>
-    <div id="bots"></div>
+  <div class="content" id="control">
+    <div class="card">📦 No bots yet. Deploy to start.</div>
+  </div>
+
+  <div class="content" id="logs" style="display:none;">
+    <div class="card"><pre id="logBox">Waiting for logs...</pre></div>
+  </div>
+
+  <div class="content" id="info" style="display:none;">
+    <div class="card" id="hostInfo">Loading...</div>
   </div>
 
   <script>
     const socket = io();
-    const botsDiv = document.getElementById("bots");
-    const hostData = document.getElementById("hostData");
-    let activeBotId = null;
+    const logBox = document.getElementById("logBox");
+    let activeBot = null;
+
+    socket.on("bots", (bots) => {
+      const c = document.getElementById("control");
+      c.innerHTML = bots.length ? "" : "<div class='card'>📦 No bots yet.</div>";
+      bots.forEach(bot => {
+        const el = document.createElement("div");
+        el.className = "card";
+        el.innerHTML = `
+          <b>${bot.name}</b> [${bot.status}]<br>
+          <button onclick="viewLogs('${bot.id}')">View Logs</button>
+        `;
+        c.appendChild(el);
+      });
+    });
+
+    socket.on("log", ({ id, text }) => {
+      if (activeBot === id) {
+        logBox.textContent += text;
+        logBox.scrollTop = logBox.scrollHeight;
+      }
+    });
+
+    async function viewLogs(id) {
+      activeBot = id;
+      document.getElementById("menu-logs").click();
+      logBox.textContent = "Fetching logs...";
+      const res = await fetch(`/api/${id}/logs`);
+      const data = await res.json();
+      logBox.textContent = data.logs.join("") || "No logs yet.";
+      socket.emit("subscribe", id);
+    }
+
+    document.getElementById("menu-control").onclick = () => showTab("control");
+    document.getElementById("menu-logs").onclick = () => showTab("logs");
+    document.getElementById("menu-info").onclick = () => showTab("info");
+
+    function showTab(tab) {
+      ["control","logs","info"].forEach(t=>{
+        document.getElementById(t).style.display = t===tab?"block":"none";
+        document.getElementById("menu-"+t).classList.toggle("active", t===tab);
+      });
+    }
 
     async function loadHost() {
       const res = await fetch("/api/host");
       const data = await res.json();
-      hostData.textContent =
-        `Platform : ${data.platform}\nCPU       : ${data.cpus}\nRAM       : ${(data.memory.total/1e9).toFixed(1)} GB\nBots      : ${data.bots}\nNode      : ${data.node}`;
+      document.getElementById("hostInfo").innerHTML = `
+        <b>Platform:</b> ${data.platform}<br>
+        <b>CPU:</b> ${data.cpus}<br>
+        <b>RAM:</b> ${data.memory}<br>
+        <b>Bots:</b> ${data.bots}<br>
+        <b>Node:</b> ${data.node}<br>
+      `;
     }
-
-    async function loadBots() {
-      const res = await fetch("/api/bots");
-      const bots = await res.json();
-      renderBots(bots);
-    }
-
-    function renderBots(bots) {
-      botsDiv.innerHTML = "";
-      bots.forEach(bot => {
-        const div = document.createElement("div");
-        div.className = "bot";
-        div.innerHTML = `
-          <div class="bot-header">
-            <div>
-              <div class="bot-name">${bot.name}</div>
-              <div>Status: <span style="color:${bot.status==="running"?"#0f0":"#f66"}">${bot.status}</span></div>
-            </div>
-            <div>
-              <button onclick="toggleLogs('${bot.id}')">Logs</button>
-              <button onclick="deleteBot('${bot.id}')">Delete</button>
-            </div>
-          </div>
-          <div id="logs-${bot.id}" class="logs-box hidden"></div>
-        `;
-        botsDiv.appendChild(div);
-      });
-    }
-
-    async function toggleLogs(id) {
-      const box = document.getElementById(`logs-${id}`);
-      const isOpen = !box.classList.contains("hidden");
-
-      // hide if already open
-      if (isOpen) {
-        socket.emit("unsubscribe", id);
-        box.classList.add("hidden");
-        box.innerHTML = "";
-        activeBotId = null;
-        return;
-      }
-
-      // close other opened logs
-      document.querySelectorAll(".logs-box").forEach(b => {
-        b.classList.add("hidden");
-        b.innerHTML = "";
-      });
-      if (activeBotId) socket.emit("unsubscribe", activeBotId);
-
-      activeBotId = id;
-      box.classList.remove("hidden");
-      box.innerHTML = "<em>Loading logs...</em>";
-      socket.emit("subscribe", id);
-
-      const res = await fetch(`/api/${id}/logs`);
-      const data = await res.json();
-      box.innerHTML = data.logs.join("") || "<em>No logs yet.</em>";
-      box.scrollTop = box.scrollHeight;
-    }
-
-    async function deleteBot(id) {
-      if (!confirm("Delete this bot?")) return;
-      await fetch(`/api/${id}/delete`, { method: "DELETE" });
-      loadBots();
-    }
-
-    socket.on("bots", renderBots);
-
-    socket.on("log", ({ id, text }) => {
-      if (activeBotId === id) {
-        const box = document.getElementById(`logs-${id}`);
-        if (box) {
-          box.innerHTML += text;
-          box.scrollTop = box.scrollHeight;
-        }
-      }
-    });
-
     loadHost();
-    loadBots();
-    setInterval(loadHost, 8000);
   </script>
 </body>
 </html>
