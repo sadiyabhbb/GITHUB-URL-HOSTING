@@ -252,7 +252,8 @@
     overlay.onclick=()=>{closeSidebar();closeModal();};
     btnServers.onclick=()=>{showSection('servers');closeSidebar();};
     btnCreate.onclick=()=>{showSection('create');closeSidebar();};
-    btnRefresh.onclick=()=>{location.reload();};
+    // 💡 FIX: Refresh বাটন এখন শুধু ডেটা লোড করবে, পেজ রিফ্রেশ করবে না।
+    btnRefresh.onclick=()=>{loadBots();closeSidebar();}; 
 
     function showSection(n){
       createSection.style.display=(n==='create'?'block':'none');
@@ -354,8 +355,10 @@
       try{
         const h=await fetch('/api/host').then(r=>r.json());
         const b=await fetch('/api/bots').then(r=>r.json());
+        
+        // 💡 FIX: index.js-এর API রেসপন্স অনুযায়ী অবজেক্ট স্ট্রাকচার তৈরি করা হয়েছে।
         const obj={
-          host:h,
+          host: h,
           panel:{
             version:'v4.7',
             bots_total:b.length,
@@ -367,9 +370,10 @@
           .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
           .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
           .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
-        infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
+        infoBox.innerHTML=`<pre style="margin:0;padding:0;"><div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div></pre>`;
       }catch(e){
-        infoBox.textContent='Host info error.';
+        infoBox.textContent='Host info error: '+e.message;
+        console.error('Host info fetch error:',e);
       }
     }
 
@@ -386,13 +390,12 @@
       fetch('/api/bots')
         .then(r=>r.json())
         .then(renderCards)
-        .then(updateInfo);
+        .then(updateInfo); // bots লোড হওয়ার পরে হোস্ট ইনফো আপডেট করা হবে
     }
 
     // ✅ Proper initialization after socket ready
     function initAfterConnect(){
-      loadBots();
-      updateInfo();
+      loadBots(); // সার্ভার লিস্ট এবং হোস্ট ইনফো লোড হবে
       setInterval(updateInfo,5000);
     }
 
