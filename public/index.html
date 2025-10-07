@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <style>
+    /* ... (CSS কোড একই থাকবে) ... */
     *{box-sizing:border-box;margin:0;padding:0}
     body{
       background:#0d1117;
@@ -252,8 +253,7 @@
     overlay.onclick=()=>{closeSidebar();closeModal();};
     btnServers.onclick=()=>{showSection('servers');closeSidebar();};
     btnCreate.onclick=()=>{showSection('create');closeSidebar();};
-    // 💡 FIX: Refresh বাটন এখন শুধু ডেটা লোড করবে, পেজ রিফ্রেশ করবে না।
-    btnRefresh.onclick=()=>{loadBots();closeSidebar();}; 
+    btnRefresh.onclick=()=>{loadBots();closeSidebar();}; // Refresh বাটন এখন loadBots() কল করে
 
     function showSection(n){
       createSection.style.display=(n==='create'?'block':'none');
@@ -356,7 +356,6 @@
         const h=await fetch('/api/host').then(r=>r.json());
         const b=await fetch('/api/bots').then(r=>r.json());
         
-        // 💡 FIX: index.js-এর API রেসপন্স অনুযায়ী অবজেক্ট স্ট্রাকচার তৈরি করা হয়েছে।
         const obj={
           host: h,
           panel:{
@@ -390,20 +389,18 @@
       fetch('/api/bots')
         .then(r=>r.json())
         .then(renderCards)
-        .then(updateInfo); // bots লোড হওয়ার পরে হোস্ট ইনফো আপডেট করা হবে
+        .then(updateInfo);
     }
 
-    // ✅ Proper initialization after socket ready
-    function initAfterConnect(){
+    // 💡 FIX: ইনিশিয়ালাইজেশন লজিক পরিবর্তন করা হয়েছে।
+    // এখন পেজ লোড হওয়ার সাথে সাথেই ডেটা লোড করার ফাংশন কল করবে।
+    function initApp(){
       loadBots(); // সার্ভার লিস্ট এবং হোস্ট ইনফো লোড হবে
       setInterval(updateInfo,5000);
     }
 
-    if (socket.connected) {
-      initAfterConnect();
-    } else {
-      socket.once("connect", initAfterConnect);
-    }
+    // এই লাইনটিই নিশ্চিত করবে যে পেজ লোড হওয়ার পর ডেটা চলে আসছে।
+    initApp(); 
 
   })();
   </script>
