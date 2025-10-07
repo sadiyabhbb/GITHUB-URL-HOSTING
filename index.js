@@ -1,3 +1,4 @@
+// server.js
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -16,7 +17,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
 app.use(bodyParser.json());
@@ -27,10 +28,12 @@ if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR, { recursive: true });
 
 const bots = new Map();
 
+// 🧹 Clean ANSI escape sequences
 function cleanAnsi(s) {
   return String(s).replace(/\x1b\[[0-9;]*m/g, "");
 }
 
+// 📜 Append logs safely
 function appendLog(id, chunk) {
   const bot = bots.get(id);
   if (!bot) return;
@@ -41,10 +44,11 @@ function appendLog(id, chunk) {
   console.log(`[${bot.name}] ${text.trim()}`);
 }
 
+// 🔄 Emit all bots
 function emitBots() {
   io.emit(
     "bots",
-    Array.from(bots.values()).map(b => ({
+    Array.from(bots.values()).map((b) => ({
       id: b.id,
       name: b.name,
       repoUrl: b.repoUrl,
@@ -56,10 +60,12 @@ function emitBots() {
   );
 }
 
+// 🚀 Start a bot
 function startBot(id) {
   const bot = bots.get(id);
   if (!bot || bot.proc) return;
   const entryPath = path.join(bot.dir, bot.entry || "index.js");
+
   if (!fs.existsSync(entryPath)) {
     appendLog(id, `❌ Entry not found: ${bot.entry}\n`);
     bot.status = "error";
@@ -69,14 +75,15 @@ function startBot(id) {
 
   appendLog(id, `🚀 Starting bot: node ${bot.entry}\n`);
   const proc = spawn("node", [bot.entry], { cwd: bot.dir, shell: true });
+
   bot.proc = proc;
   bot.status = "running";
   bot.startTime = Date.now();
   emitBots();
 
-  proc.stdout.on("data", d => appendLog(id, d));
-  proc.stderr.on("data", d => appendLog(id, d));
-  proc.on("close", code => {
+  proc.stdout.on("data", (d) => appendLog(id, d));
+  proc.stderr.on("data", (d) => appendLog(id, d));
+  proc.on("close", (code) => {
     appendLog(id, `⚠️ Bot exited (code=${code})\n`);
     bot.proc = null;
     bot.status = "stopped";
@@ -85,7 +92,7 @@ function startBot(id) {
   });
 }
 
-// Deploy new bot
+// 📦 Deploy new bot
 app.post("/api/deploy", async (req, res) => {
   try {
     const { repoUrl, name, entry = "index.js" } = req.body;
@@ -97,6 +104,7 @@ app.post("/api/deploy", async (req, res) => {
 
     const appDir = path.join(APPS_DIR, safeName);
     const id = uuidv4();
+
     bots.set(id, {
       id,
       name: safeName,
@@ -107,6 +115,7 @@ app.post("/api/deploy", async (req, res) => {
       logs: [],
       status: "cloning",
     });
+
     emitBots();
     appendLog(id, `📦 Cloning ${repoUrl}...\n`);
 
@@ -117,14 +126,15 @@ app.post("/api/deploy", async (req, res) => {
     bots.get(id).status = "installing";
     emitBots();
     appendLog(id, `📦 Installing dependencies...\n`);
+
     await new Promise((resolve, reject) => {
       const npm = spawn("npm", ["install", "--no-audit", "--no-fund", "--legacy-peer-deps"], {
         cwd: appDir,
         shell: true,
       });
-      npm.stdout.on("data", d => appendLog(id, d));
-      npm.stderr.on("data", d => appendLog(id, d));
-      npm.on("close", code => (code === 0 ? resolve() : reject()));
+      npm.stdout.on("data", (d) => appendLog(id, d));
+      npm.stderr.on("data", (d) => appendLog(id, d));
+      npm.on("close", (code) => (code === 0 ? resolve() : reject()));
     });
 
     bots.get(id).status = "stopped";
@@ -136,11 +146,13 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
+// ▶️ Start
 app.post("/api/:id/start", (req, res) => {
   startBot(req.params.id);
   res.json({ message: "starting" });
 });
 
+// ⏹ Stop
 app.post("/api/:id/stop", (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "not found" });
@@ -153,6 +165,7 @@ app.post("/api/:id/stop", (req, res) => {
   res.json({ message: "stopped" });
 });
 
+// 🔁 Restart
 app.post("/api/:id/restart", (req, res) => {
   const id = req.params.id;
   const bot = bots.get(id);
@@ -163,6 +176,7 @@ app.post("/api/:id/restart", (req, res) => {
   res.json({ message: "restarting" });
 });
 
+// ❌ Delete
 app.delete("/api/:id/delete", (req, res) => {
   const id = req.params.id;
   const bot = bots.get(id);
@@ -178,26 +192,29 @@ app.delete("/api/:id/delete", (req, res) => {
   }
 });
 
+// 🧾 Logs
 app.get("/api/:id/logs", (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "not found" });
   res.json({ logs: bot.logs.slice(-2000) });
 });
 
-// Host info
+// 💻 Host info
 app.get("/api/host", (req, res) => {
   res.json({
-    platform: os.platform(),
+    os: os.platform(),
     arch: os.arch(),
-    node: process.version,
-    cwd: process.cwd(),
     cpus: os.cpus().length,
-    memory: { total: os.totalmem(), free: os.freemem() },
     uptime: os.uptime(),
+    memory: {
+      total: (os.totalmem() / 1024 / 1024 / 1024).toFixed(2) + " GB",
+      free: (os.freemem() / 1024 / 1024 / 1024).toFixed(2) + " GB",
+    },
+    node: process.version,
   });
 });
 
-// Socket events
+// 🔌 Socket.io events
 io.on("connection", (socket) => {
   socket.emit("bots", Array.from(bots.values()));
   socket.on("attachConsole", (id) => {
@@ -209,12 +226,12 @@ io.on("connection", (socket) => {
   socket.on("detachConsole", (id) => socket.leave(id));
 });
 
-// Always open main panel page
-app.get("/", (req, res) =>
-  res.sendFile(path.join(__dirname, "public", "index.html"))
-);
+// 🏠 Always open main panel first
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () =>
-  console.log(`🚀 XAVIA PANEL v4.7 running on port ${PORT}`)
+  console.log(`🚀 XAVIA PANEL v4.7 running at http://localhost:${PORT}`)
 );
