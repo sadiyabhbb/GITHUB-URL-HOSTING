@@ -3,132 +3,198 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>HEADSHOT PANEL v4.2</title>
+  <title>HEADSHOT PANEL v4.3</title>
   <style>
     :root{
-      --bg:#0b0f14;
+      --bg:#071018;
       --panel:#0f1418;
       --card:#11161a;
-      --muted:#9aa6b2;
+      --muted:#98a3a8;
       --accent:#00ffd1;
-      --accent-2:#00b3ff;
+      --accent2:#00b3ff;
       --danger:#ff5b5b;
       --brand-font: system-ui, "Poppins", "Inter", sans-serif;
+      --toast-bg: rgba(0,0,0,0.6);
     }
     *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(180deg,#071018,#0b0f14);color:#e6f0f2;font-family:var(--brand-font);padding:12px}
-    header{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:1100px;margin:0 auto 12px}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#0b0f14);color:#e6f0f2;font-family:var(--brand-font);padding:12px}
+    header{max-width:1100px;margin:0 auto 8px;display:flex;align-items:center;justify-content:space-between}
     .brand h1{margin:0;color:var(--accent);font-size:18px;font-weight:700}
     .brand small{color:var(--muted);font-size:12px}
-    .menu-btn{background:transparent;border:1px solid rgba(255,255,255,0.05);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
-    .menu-drawer{position:fixed;top:65px;right:15px;background:var(--panel);border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:15px;width:90%;max-width:420px;display:none;flex-direction:column;gap:10px;box-shadow:0 0 20px #00fff533;z-index:50}
-    .menu-drawer.active{display:flex}
-    .menu-drawer input{background:var(--card);border:1px solid #1a252a;color:var(--muted);padding:10px;border-radius:8px}
-    .menu-drawer button{background:linear-gradient(90deg,var(--accent),var(--accent-2));border:none;padding:10px;border-radius:8px;color:#001;font-weight:700;cursor:pointer}
-    .top-row{max-width:1100px;margin:0 auto 8px;display:flex;align-items:center;justify-content:space-between}
-    .small{font-size:13px;color:var(--muted)}
-    .layout{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:14px}
-    .console-box{background:#000;color:#fff;font-family:ui-monospace,monospace;font-size:13px;padding:12px;border-radius:10px;height:450px;overflow:auto;white-space:pre-wrap;border:1px solid rgba(255,255,255,0.05)}
-    .controls{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
-    .btn{padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
-    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted)}
-    .btn.accent{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#001}
-    .btn.danger{background:var(--danger);color:#fff}
-    .host-info{background:linear-gradient(90deg,rgba(0,255,209,0.03),rgba(0,179,255,0.02));padding:10px;border-radius:8px;font-size:13px;color:var(--muted);margin-top:10px}
-    .cards{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding-right:6px}
-    .card{background:var(--panel);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.05)}
-    .card-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    .menu-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
+    .menu-popup{position:fixed;top:60px;right:20px;background:var(--panel);padding:10px;border-radius:10px;display:none;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 10px 30px rgba(0,0,0,0.6);z-index:40;width:220px}
+    .menu-popup.active{display:flex}
+    .menu-popup button{background:transparent;border:none;color:var(--muted);text-align:left;padding:8px;border-radius:8px;cursor:pointer}
+    .layout{max-width:1100px;margin:0 auto;display:grid;gap:14px}
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.02)}
+    .cards{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow:auto;padding-right:6px}
+    .card{background:var(--card);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.03)}
+    .card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
     .card-title{font-weight:700;color:var(--accent)}
     .meta{color:var(--muted);font-size:13px}
     .card-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-    .card .logs-btn{background:#050608;color:#dfffe6;font-family:monospace;padding:10px;border-radius:8px;display:block;margin-top:10px;white-space:pre-wrap;max-height:0;overflow:hidden;transition:max-height 240ms ease}
-    .card.expanded .logs-btn{max-height:320px}
-    @media(max-width:600px){.console-box{height:320px}.card.expanded .logs-btn{max-height:260px}}
+    .btn{padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted)}
+    .btn.accent{background:linear-gradient(90deg,var(--accent),var(--accent2));border:none;color:#001}
+    .btn.danger{background:var(--danger);border:none;color:#fff}
+    .console{background:#000;color:#e6f0f2;font-family:ui-monospace,monospace;padding:12px;border-radius:10px;height:340px;overflow:auto;white-space:pre-wrap;border:1px solid rgba(255,255,255,0.03)}
+    .controls{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+    .host{background:linear-gradient(90deg,rgba(0,255,209,0.03),rgba(0,179,255,0.02));padding:10px;border-radius:8px;font-size:13px;color:var(--muted)}
+    .logs-area{max-height:260px;overflow:auto}
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:28px;background:var(--toast-bg);color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.6);display:none;z-index:60}
+    .toast.show{display:block;animation:fade 0.2s ease}
+    @keyframes fade{from{opacity:0}to{opacity:1}}
+    @media(max-width:920px){.console{height:300px}.cards{max-height:40vh}}
+    @media(max-width:520px){.console{height:260px}.cards{max-height:30vh}}
   </style>
 </head>
 <body>
   <header>
     <div class="brand">
       <h1>HEADSHOT PANEL</h1>
-      <small class="small">v4.2 • Dark Neon • Stable</small>
+      <small>v4.3 • Dark Neon • Stable</small>
     </div>
-    <button id="menuBtn" class="menu-btn">☰</button>
+    <div>
+      <button id="menuBtn" class="menu-btn">☰</button>
+      <div id="menuPopup" class="menu-popup">
+        <button id="openServers">Servers</button>
+        <button id="openCreate">Create Server</button>
+        <button id="refreshAll">Refresh</button>
+      </div>
+    </div>
   </header>
 
-  <div id="menuDrawer" class="menu-drawer">
-    <input id="repo" placeholder="Git repo URL (https://github.com/user/repo.git)">
-    <input id="entry" placeholder="Entry (index.js)">
-    <input id="bname" placeholder="Bot name (optional)">
-    <button id="deployBtn">Create</button>
-    <button id="closeMenu" class="btn ghost">Close</button>
-  </div>
-
-  <div class="top-row">
-    <div class="small">Manage bots — deploy, update, start/stop, view logs & host info</div>
-    <div id="summary" class="small">Loading...</div>
-  </div>
-
   <div class="layout">
-    <div class="cards" id="cards"></div>
-    <div class="console-box" id="console">Console ready</div>
-    <div class="controls">
-      <div>
-        <button id="copyAll" class="btn ghost">Copy Logs</button>
-        <button id="clearAll" class="btn ghost">Clear</button>
+    <div id="serversPanel" class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700;color:var(--accent)">Servers</div>
+        <div id="summary" class="meta">Loading...</div>
       </div>
-      <div class="small" id="attached">No bot attached</div>
+      <div style="height:12px"></div>
+      <div class="cards" id="cards"></div>
     </div>
-    <div class="host-info" id="hostInfo">Host info loading</div>
+
+    <div id="createPanel" class="panel" style="display:none">
+      <div style="font-weight:700;color:var(--accent)">Create Server</div>
+      <div style="height:10px"></div>
+      <input id="repo" placeholder="Git repo URL (https://github.com/user/repo.git)" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:var(--card);color:#e6f0f2">
+      <div style="height:8px"></div>
+      <input id="entry" placeholder="Entry (index.js)" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:var(--card);color:#e6f0f2">
+      <div style="height:8px"></div>
+      <input id="name" placeholder="Bot name (optional)" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:var(--card);color:#e6f0f2">
+      <div style="height:12px"></div>
+      <div style="display:flex;gap:8px">
+        <button id="createBtn" class="btn accent">Create</button>
+        <button id="cancelCreate" class="btn ghost">Cancel</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700;color:var(--accent)">Console</div>
+        <div id="attached" class="meta">No bot attached</div>
+      </div>
+      <div style="height:10px"></div>
+      <div id="console" class="console">Console ready</div>
+      <div class="controls">
+        <div>
+          <button id="copyAll" class="btn ghost">Copy Logs</button>
+          <button id="clearAll" class="btn ghost">Clear</button>
+        </div>
+        <div id="hostInfo" class="host">Host info loading</div>
+      </div>
+    </div>
   </div>
+
+  <div id="toast" class="toast"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
 const menuBtn = document.getElementById("menuBtn");
-const menuDrawer = document.getElementById("menuDrawer");
-const deployBtn = document.getElementById("deployBtn");
-const closeMenu = document.getElementById("closeMenu");
-const repo = document.getElementById("repo");
-const entry = document.getElementById("entry");
-const bname = document.getElementById("bname");
+const menuPopup = document.getElementById("menuPopup");
+const openServers = document.getElementById("openServers");
+const openCreate = document.getElementById("openCreate");
+const refreshAll = document.getElementById("refreshAll");
+const serversPanel = document.getElementById("serversPanel");
+const createPanel = document.getElementById("createPanel");
 const cards = document.getElementById("cards");
-const consoleBox = document.getElementById("console");
+const summary = document.getElementById("summary");
+const consoleEl = document.getElementById("console");
+const attached = document.getElementById("attached");
+const hostInfo = document.getElementById("hostInfo");
+const toast = document.getElementById("toast");
+const repoInput = document.getElementById("repo");
+const entryInput = document.getElementById("entry");
+const nameInput = document.getElementById("name");
+const createBtn = document.getElementById("createBtn");
+const cancelCreate = document.getElementById("cancelCreate");
 const copyAll = document.getElementById("copyAll");
 const clearAll = document.getElementById("clearAll");
-const attached = document.getElementById("attached");
-const summary = document.getElementById("summary");
-const hostInfo = document.getElementById("hostInfo");
+
 let bots = [];
 
-menuBtn.onclick = () => menuDrawer.classList.toggle("active");
-closeMenu.onclick = () => menuDrawer.classList.remove("active");
+menuBtn.onclick = () => menuPopup.classList.toggle("active");
+openServers.onclick = () => showPanel("servers");
+openCreate.onclick = () => showPanel("create");
+refreshAll.onclick = () => loadBots();
 
-deployBtn.onclick = async () => {
-  const repoUrl = repo.value.trim();
-  const entryFile = entry.value.trim() || "index.js";
-  const name = bname.value.trim();
-  if (!repoUrl) return alert("Enter repo URL");
-  deployBtn.disabled = true;
-  deployBtn.textContent = "Creating...";
-  try {
-    const res = await fetch("/api/deploy", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ repoUrl, name, entry: entryFile }) });
-    const j = await res.json();
-    if (j.error) alert("Deploy error: " + j.error);
-    else { repo.value = ""; entry.value = ""; bname.value = ""; menuDrawer.classList.remove("active"); }
-  } catch (e) {
-    alert("Deploy failed");
+function showPanel(p) {
+  menuPopup.classList.remove("active");
+  if (p === "servers") {
+    serversPanel.style.display = "block";
+    createPanel.style.display = "none";
+  } else {
+    serversPanel.style.display = "none";
+    createPanel.style.display = "block";
   }
-  deployBtn.disabled = false;
-  deployBtn.textContent = "Create";
+}
+
+function showToast(text, timeout = 3000) {
+  toast.textContent = text;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), timeout);
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  return res.json();
+}
+async function apiDelete(path) {
+  const res = await fetch(path, { method: "DELETE" });
+  return res.json();
+}
+
+createBtn.onclick = async () => {
+  const repoUrl = repoInput.value.trim();
+  const entry = entryInput.value.trim() || "index.js";
+  const name = nameInput.value.trim();
+  if (!repoUrl) { showToast("Enter repository URL"); return; }
+  createBtn.disabled = true;
+  createBtn.textContent = "Creating...";
+  try {
+    const j = await apiPost("/api/deploy", { repoUrl, name, entry });
+    if (j.error) showToast("Deploy error: " + j.error);
+    else {
+      repoInput.value = ""; entryInput.value = ""; nameInput.value = "";
+      showPanel("servers");
+      showToast("Create started");
+    }
+  } catch (e) {
+    showToast("Create failed");
+  }
+  createBtn.disabled = false;
+  createBtn.textContent = "Create";
+  loadBots();
 };
+
+cancelCreate.onclick = () => { repoInput.value = ""; entryInput.value = ""; nameInput.value = ""; showPanel("servers"); };
 
 socket.on("bots", list => {
   bots = list;
-  renderCards(list);
+  render(list);
 });
-socket.on("globalLog", d => {
-  appendConsole(`[${d.id}] ${d.text}`);
-});
+socket.on("globalLog", d => appendConsole(`[${d.id}] ${d.text}`));
 socket.on("log", d => {
   if (d && d.id && d.text) {
     const el = document.getElementById("logs-" + d.id);
@@ -140,27 +206,29 @@ socket.on("log", d => {
 });
 
 function appendConsole(text) {
-  const el = document.createElement("div");
-  el.textContent = text;
-  consoleBox.appendChild(el);
-  consoleBox.scrollTop = consoleBox.scrollHeight;
+  const div = document.createElement("div");
+  div.textContent = text;
+  consoleEl.appendChild(div);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
 }
 
-function renderCards(list) {
+function escapeHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+
+function render(list) {
   cards.innerHTML = "";
   list.forEach(b => {
-    const c = document.createElement("div");
-    c.className = "card";
-    c.dataset.id = b.id;
-    const statusText = b.status === "running" ? "running" : "stopped";
-    const uptime = b.startTime ? formatUptime(Date.now() - new Date(b.startTime).getTime()) : "-";
-    c.innerHTML = `
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
       <div class="card-head">
         <div>
           <div class="card-title">${escapeHtml(b.name)}</div>
           <div class="meta">entry: ${escapeHtml(b.entry || "index.js")} • repo: ${b.repoUrl ? "<a href='" + escapeHtml(b.repoUrl) + "' target='_blank' style='color:var(--accent)'>repo</a>" : "(no repo)"}</div>
         </div>
-        <div class="meta">${statusText} • uptime: ${uptime}</div>
+        <div class="meta">${b.status === "running" ? "running" : "stopped"} • uptime: ${b.startTime ? formatUptime(Date.now() - new Date(b.startTime).getTime()) : "-"}</div>
       </div>
       <div class="card-actions">
         <button class="btn accent start">Start</button>
@@ -168,20 +236,27 @@ function renderCards(list) {
         <button class="btn ghost restart">Restart</button>
         <button class="btn ghost update">Update</button>
         <button class="btn danger delete">Delete</button>
-        <button class="btn ghost toggleLogs">Show Logs</button>
+        <button class="btn ghost showLogs">Show Logs</button>
       </div>
       <div class="logs-btn" id="logs-${b.id}"></div>
     `;
-    c.querySelector(".start").onclick = async () => { await apiPost(`/${b.id}/start`); };
-    c.querySelector(".stop").onclick = async () => { await apiPost(`/${b.id}/stop`); };
-    c.querySelector(".restart").onclick = async () => { await apiPost(`/${b.id}/restart`); };
-    c.querySelector(".update").onclick = async () => { await apiPost(`/${b.id}/update`); };
-    c.querySelector(".delete").onclick = async () => { if (!confirm("Delete bot?")) return; await apiDelete(`/${b.id}/delete`); };
-    c.querySelector(".toggleLogs").onclick = async () => {
-      c.classList.toggle("expanded");
+    const startBtn = card.querySelector(".start");
+    const stopBtn = card.querySelector(".stop");
+    const restartBtn = card.querySelector(".restart");
+    const updateBtn = card.querySelector(".update");
+    const deleteBtn = card.querySelector(".delete");
+    const showLogsBtn = card.querySelector(".showLogs");
+    startBtn.onclick = async () => { await apiPost("/api/" + b.id + "/start"); showToast("Start requested"); loadBots(); };
+    stopBtn.onclick = async () => { await apiPost("/api/" + b.id + "/stop"); showToast("Stop requested"); loadBots(); };
+    restartBtn.onclick = async () => { await apiPost("/api/" + b.id + "/restart"); showToast("Restart requested"); loadBots(); };
+    updateBtn.onclick = async () => { await apiPost("/api/" + b.id + "/update"); showToast("Update requested"); loadBots(); };
+    deleteBtn.onclick = async () => { if (!confirm("Delete bot?")) return; await apiDelete("/api/" + b.id + "/delete"); showToast("Deleted"); loadBots(); };
+    showLogsBtn.onclick = async () => {
       const logEl = document.getElementById("logs-" + b.id);
-      if (c.classList.contains("expanded")) {
-        const r = await fetch(`/api/${b.id}/logs`); const j = await r.json();
+      card.classList.toggle("expanded");
+      if (card.classList.contains("expanded")) {
+        const r = await fetch("/api/" + b.id + "/logs");
+        const j = await r.json();
         logEl.textContent = (j.logs || []).join("");
         logEl.scrollTop = logEl.scrollHeight;
         socket.emit("subscribe", b.id);
@@ -190,14 +265,10 @@ function renderCards(list) {
         attached.textContent = "No bot attached";
       }
     };
-    cards.appendChild(c);
+    cards.appendChild(card);
   });
   summary.textContent = `${list.filter(x => x.status === "running").length} running • ${list.filter(x => x.status !== "running").length} stopped • ${list.length} total`;
 }
-
-function escapeHtml(s) { if (!s) return ""; return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
-async function apiPost(p) { const r = await fetch("/api" + p, { method: "POST" }); return r.json(); }
-async function apiDelete(p) { const r = await fetch("/api" + p, { method: "DELETE" }); return r.json(); }
 
 function formatUptime(ms) {
   if (!ms || ms <= 0) return "-";
@@ -212,28 +283,27 @@ function formatUptime(ms) {
   return `${sec}s`;
 }
 
-copyAll.onclick = async () => {
-  await navigator.clipboard.writeText(consoleBox.textContent);
-};
-clearAll.onclick = () => consoleBox.textContent = "";
+copyAll.onclick = async () => { await navigator.clipboard.writeText(consoleEl.textContent); showToast("Copied logs"); };
+clearAll.onclick = () => { consoleEl.textContent = ""; };
 
-fetch("/api/host").then(r => r.json()).then(h => {
-  hostInfo.innerHTML = `<div><b>Node:</b> ${h.node} • <b>Platform:</b> ${h.platform}/${h.arch}</div>
-  <div style="margin-top:6px"><b>Path:</b> ${h.cwd}</div>
-  <div style="margin-top:6px"><b>CPUs:</b> ${h.cpus} • <b>Bots:</b> ${h.bots}</div>`;
-});
+async function loadHost() {
+  try {
+    const r = await fetch("/api/host"); const j = await r.json();
+    hostInfo.innerHTML = `<div><b>Node:</b> ${j.node} • <b>Platform:</b> ${j.platform}/${j.arch}</div>
+    <div style="margin-top:6px"><b>Path:</b> ${j.cwd}</div>
+    <div style="margin-top:6px"><b>CPUs:</b> ${j.cpus} • <b>Bots:</b> ${j.bots}</div>`;
+  } catch (e) {}
+}
 
-fetch("/api/bots").then(r => r.json()).then(list => {
-  bots = list;
-  renderCards(list);
-});
+async function loadBots() {
+  const r = await fetch("/api/bots"); const j = await r.json();
+  bots = j;
+  render(j);
+  loadHost();
+}
 
-setInterval(() => {
-  fetch("/api/bots").then(r => r.json()).then(list => {
-    bots = list;
-    renderCards(list);
-  });
-}, 10000);
+loadBots();
+setInterval(loadBots, 10000);
 </script>
 </body>
 </html>
