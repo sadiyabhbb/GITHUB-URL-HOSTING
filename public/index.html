@@ -147,7 +147,7 @@
     }
     #modalMeta{font-size:12px;color:#8b949e;}
     .json-box{
-      height:260px;
+      height:280px;
       background:#000;
       border:1px solid #30363d;
       overflow:auto;
@@ -382,6 +382,8 @@
         .then(updateInfo);
     }
 
+    // 🟢 Fix: Auto host info update at page load
+    updateInfo();
     loadBots();
     setInterval(updateInfo,5000);
   })();
