@@ -264,6 +264,7 @@ app.get("/api/:id/logs", (req, res) => {
   res.json({ logs: bot.logs.slice(-2000) });
 });
 
+// 💡 FIX: /api/host এখন শুধু হোস্টের তথ্য পাঠাচ্ছে।
 app.get("/api/host", (req, res) => {
   res.json({
     platform: os.platform(),
@@ -271,9 +272,8 @@ app.get("/api/host", (req, res) => {
     node: process.version,
     cwd: process.cwd(),
     cpus: os.cpus().length,
-    memory: { total: os.totalmem(), free: os.freemem() },
+    memory: { total: os.totalmem(), free: os.freemem() }, // মেমরি বাইটে পাঠাচ্ছে
     uptime: os.uptime(),
-    bots: bots.size,
   });
 });
 
@@ -289,17 +289,6 @@ io.on("connection", (socket) => {
     dir: b.dir,
   }));
   socket.emit("bots", list);
-
-  socket.emit("host", {
-    platform: os.platform(),
-    arch: os.arch(),
-    node: process.version,
-    cwd: process.cwd(),
-    cpus: os.cpus().length,
-    memory: { total: os.totalmem(), free: os.freemem() },
-    uptime: os.uptime(),
-    bots: bots.size,
-  });
 
   socket.on("attachConsole", (id) => {
     const bot = bots.get(id);
