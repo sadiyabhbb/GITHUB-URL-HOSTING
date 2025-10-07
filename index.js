@@ -1,4 +1,3 @@
-// index.js — HEADSHOT PANEL v4.0
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -24,10 +23,8 @@ app.use(express.static(path.join(__dirname, "public")));
 const APPS_DIR = path.join(__dirname, "apps");
 if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR, { recursive: true });
 
-// bots map: id => { id, name, dir, entry, repoUrl, proc, logs[], status, startTime }
 const bots = new Map();
 
-// utils
 function cleanAnsi(s) {
   return String(s).replace(/\x1b\[[0-9;]*m/g, "");
 }
@@ -37,10 +34,8 @@ function appendLog(id, chunk) {
   const txt = cleanAnsi(String(chunk));
   bot.logs.push(txt);
   if (bot.logs.length > 5000) bot.logs.splice(0, bot.logs.length - 5000);
-  io.to(id).emit("log", txt);            // emit to subscribers of that bot
-  io.emit("globalLog", { id, text: txt }); // also emit global for admin view
-  // Also optionally write a per-bot logfile on disk (uncomment if desired)
-  // fs.appendFileSync(path.join(bot.dir, 'bot.log'), txt);
+  io.to(id).emit("log", txt);
+  io.emit("globalLog", { id, text: txt });
   console.log(`[${bot.name}] ${txt.trim()}`);
 }
 function emitBots() {
@@ -55,21 +50,9 @@ function emitBots() {
   }));
   io.emit("bots", list);
 }
-function spawnProcess(id, cmd, args, opts = {}) {
-  const proc = spawn(cmd, args, { ...opts, shell: true });
-  proc.stdout.on("data", d => appendLog(id, d));
-  proc.stderr.on("data", d => appendLog(id, d));
-  proc.on("close", (code, signal) => {
-    appendLog(id, `\n=== process exited code=${code}, signal=${signal} ===\n`);
-  });
-  return proc;
-}
-
-// start bot helper
 function startBot(id) {
   const bot = bots.get(id);
-  if (!bot) return;
-  if (bot.proc) return;
+  if (!bot || bot.proc) return;
   const entry = bot.entry || "index.js";
   const entryPath = path.join(bot.dir, entry);
   if (!fs.existsSync(entryPath)) {
@@ -101,25 +84,24 @@ function startBot(id) {
   });
 }
 
-// ---------- API ----------
-
-// deploy: clone (if not exists) then npm install then start (delayed)
 app.post("/api/deploy", async (req, res) => {
   try {
     const { repoUrl, name, entry = "index.js" } = req.body;
     if (!repoUrl) return res.status(400).json({ error: "repoUrl required" });
 
-    const safeName = (name && name.trim()) ? name.trim().replace(/\s+/g, "-") : path.basename(repoUrl).replace(/\.git$/, '') + "-" + uuidv4().slice(0,6);
+    const safeName = (name && name.trim())
+      ? name.trim().replace(/\s+/g, "-")
+      : path.basename(repoUrl).replace(/\.git$/, '') + "-" + uuidv4().slice(0, 6);
+
     const appDir = path.join(APPS_DIR, safeName);
     const id = uuidv4();
 
-    // create bot record
     bots.set(id, { id, name: safeName, repoUrl, dir: appDir, entry, proc: null, logs: [], status: "cloning" });
     emitBots();
     appendLog(id, `🌀 Cloning ${repoUrl} -> ${appDir}\n`);
 
     const git = simpleGit();
-    // if folder exists but not a git repo, remove to avoid conflicts
+
     if (fs.existsSync(appDir) && !fs.existsSync(path.join(appDir, ".git"))) {
       fs.rmSync(appDir, { recursive: true, force: true });
     }
@@ -133,22 +115,20 @@ app.post("/api/deploy", async (req, res) => {
       appendLog(id, `✅ Clone finished\n`);
     }
 
-    // install
     bots.get(id).status = "installing";
     emitBots();
-    appendLog(id, `📦 npm install (may take a while)...\n`);
+    appendLog(id, `📦 npm install ...\n`);
     await new Promise((resolve, reject) => {
       const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], { cwd: appDir, shell: true });
       npm.stdout.on("data", d => appendLog(id, d));
       npm.stderr.on("data", d => appendLog(id, d));
-      npm.on("close", (code) => code === 0 ? resolve() : reject(new Error("npm install failed: " + code)));
+      npm.on("close", code => code === 0 ? resolve() : reject(new Error("npm install failed: " + code)));
     });
 
     bots.get(id).status = "stopped";
     emitBots();
     appendLog(id, `✅ Install done — starting in 2s...\n`);
     setTimeout(() => startBot(id), 2000);
-
     res.json({ id, name: safeName, dir: appDir });
   } catch (err) {
     console.error(err);
@@ -156,7 +136,6 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
-// update: git pull + npm install + restart
 app.post("/api/:id/update", async (req, res) => {
   const id = req.params.id;
   const bot = bots.get(id);
@@ -166,6 +145,7 @@ app.post("/api/:id/update", async (req, res) => {
     appendLog(id, `🔁 Updating: git pull in ${bot.dir}\n`);
     bot.status = "updating";
     emitBots();
+
     const git = simpleGit(bot.dir);
     await git.pull();
     appendLog(id, `✅ Git pull complete\n`);
@@ -179,12 +159,11 @@ app.post("/api/:id/update", async (req, res) => {
     });
 
     appendLog(id, `🔁 Restarting in 2s...\n`);
-    if (bot.proc) try { bot.proc.kill(); } catch(e){}
+    if (bot.proc) bot.proc.kill();
     bot.proc = null;
     bot.status = "stopped";
     emitBots();
     setTimeout(() => startBot(id), 2000);
-
     res.json({ message: "updated" });
   } catch (err) {
     appendLog(id, `❌ Update failed: ${err.message}\n`);
@@ -194,12 +173,11 @@ app.post("/api/:id/update", async (req, res) => {
   }
 });
 
-// start/stop/restart
 app.post("/api/:id/start", (req, res) => { startBot(req.params.id); res.json({ message: "starting" }); });
 app.post("/api/:id/stop", (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
-  if (bot.proc) try { bot.proc.kill(); } catch(e){}
+  if (bot.proc) bot.proc.kill();
   bot.proc = null; bot.status = "stopped"; delete bot.startTime;
   emitBots();
   appendLog(req.params.id, "🛑 Stopped manually\n");
@@ -208,19 +186,17 @@ app.post("/api/:id/stop", (req, res) => {
 app.post("/api/:id/restart", (req, res) => {
   const id = req.params.id; const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
-  if (bot.proc) try { bot.proc.kill(); } catch(e){}
+  if (bot.proc) bot.proc.kill();
   appendLog(id, "🔁 Manual restart...\n");
   setTimeout(() => startBot(id), 1500);
   res.json({ message: "restarting" });
 });
-
-// delete bot (stop + remove folder)
 app.delete("/api/:id/delete", (req, res) => {
   const id = req.params.id;
   const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   try {
-    if (bot.proc) try { bot.proc.kill(); } catch(e){}
+    if (bot.proc) bot.proc.kill();
     if (fs.existsSync(bot.dir)) fs.rmSync(bot.dir, { recursive: true, force: true });
     bots.delete(id);
     emitBots();
@@ -231,10 +207,10 @@ app.delete("/api/:id/delete", (req, res) => {
   }
 });
 
-// list bots & logs endpoints
 app.get("/api/bots", (req, res) => {
   const list = Array.from(bots.values()).map(b => ({
-    id: b.id, name: b.name, repoUrl: b.repoUrl, entry: b.entry, status: b.status, startTime: b.startTime || null, dir: b.dir
+    id: b.id, name: b.name, repoUrl: b.repoUrl, entry: b.entry,
+    status: b.status, startTime: b.startTime || null, dir: b.dir
   }));
   res.json(list);
 });
@@ -243,8 +219,6 @@ app.get("/api/:id/logs", (req, res) => {
   if (!bot) return res.status(404).json({ error: "bot not found" });
   res.json({ logs: bot.logs.slice(-2000) });
 });
-
-// host info
 app.get("/api/host", (req, res) => {
   res.json({
     platform: os.platform(),
@@ -257,11 +231,10 @@ app.get("/api/host", (req, res) => {
   });
 });
 
-// sockets
 io.on("connection", socket => {
-  // emit bots snapshot
   const list = Array.from(bots.values()).map(b => ({
-    id: b.id, name: b.name, repoUrl: b.repoUrl, entry: b.entry, status: b.status, startTime: b.startTime || null, dir: b.dir
+    id: b.id, name: b.name, repoUrl: b.repoUrl, entry: b.entry,
+    status: b.status, startTime: b.startTime || null, dir: b.dir
   }));
   socket.emit("bots", list);
 
@@ -269,12 +242,10 @@ io.on("connection", socket => {
     const bot = bots.get(id);
     if (!bot) return socket.emit("error", "bot not found");
     socket.join(id);
-    // send current log buffer
     socket.emit("init", bot.logs.join(""));
   });
 });
 
-// serve UI
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
 const PORT = process.env.PORT || 3000;
