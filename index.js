@@ -1,189 +1,187 @@
-// HEADSHOT PANEL v3.7 — Fixed Update + Mobile Logs + Smart Restart
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
-import bodyParser from "body-parser";
-import path from "path";
-import fs from "fs";
-import { spawn } from "child_process";
+import { exec, spawn } from "child_process";
+import { join } from "path";
+import { existsSync, mkdirSync, appendFileSync, readFileSync } from "fs";
 import simpleGit from "simple-git";
-import { fileURLToPath } from "url";
+import bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import moment from "moment-timezone";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+const PORT = process.env.PORT || 3000;
+
+// === Directories ===
+const baseDir = join(process.cwd(), "apps");
+if (!existsSync(baseDir)) mkdirSync(baseDir);
+
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static("public"));
 
-const APPS_DIR = path.join(__dirname, "apps");
-if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR);
-
-const bots = new Map(); // id -> { id, name, dir, proc, logs, status, startTime, entry }
+// === Memory store ===
+let bots = [];
 
 // === Utility ===
-function appendLog(id, chunk) {
-  const bot = bots.get(id);
-  if (!bot) return;
-  const txt = String(chunk);
-  bot.logs.push(txt);
-  if (bot.logs.length > 5000) bot.logs.splice(0, bot.logs.length - 5000);
-  io.to(id).emit("log", txt);
-  console.log(`[${bot.name}] ${txt.trim()}`);
+function logFile(botId) {
+  const dir = join(baseDir, botId);
+  if (!existsSync(dir)) mkdirSync(dir);
+  return join(dir, "bot.log");
+}
+function log(botId, data) {
+  appendFileSync(logFile(botId), `[${moment().format("HH:mm:ss")}] ${data}\n`);
 }
 
-function spawnProcess(id, cmd, args, opts = {}) {
-  const proc = spawn(cmd, args, { ...opts, shell: true });
-  proc.stdout.on("data", (d) => appendLog(id, d));
-  proc.stderr.on("data", (d) => appendLog(id, d));
-  proc.on("close", (code, signal) => {
-    appendLog(id, `\n=== process exited code=${code}, signal=${signal} ===\n`);
-    const bot = bots.get(id);
-    if (bot) {
-      bot.proc = null;
-      bot.status = "stopped";
-      delete bot.startTime;
-      io.emit("bots", Array.from(bots.values()));
-    }
-  });
-  return proc;
-}
+// === API ROUTES ===
 
-// === DEPLOY ===
+// get all bots
+app.get("/api/bots", (req, res) => {
+  res.json(bots.map(b => ({
+    id: b.id,
+    name: b.name,
+    status: b.proc ? "running" : "stopped",
+    startTime: b.startTime || null
+  })));
+});
+
+// deploy new bot
 app.post("/api/deploy", async (req, res) => {
+  const { repoUrl, name, entry = "index.js" } = req.body;
+  if (!repoUrl) return res.json({ error: "Missing repoUrl" });
+
+  const id = uuidv4().slice(0, 8);
+  const dir = join(baseDir, id);
+  const git = simpleGit();
+
   try {
-    const { repoUrl, name, entry = "index.js" } = req.body;
-    if (!repoUrl) return res.status(400).json({ error: "repoUrl required" });
-
-    const id = uuidv4();
-    const repoName = name ? name.replace(/\s+/g, "-") : `bot-${id.slice(0, 6)}`;
-    const appDir = path.join(APPS_DIR, repoName);
-    const git = simpleGit();
-
-    if (fs.existsSync(appDir)) fs.rmSync(appDir, { recursive: true, force: true });
-    bots.set(id, { id, name: repoName, dir: appDir, proc: null, logs: [], status: "cloning", entry });
-    io.emit("bots", Array.from(bots.values()));
-    appendLog(id, `🌀 Cloning ${repoUrl}\n`);
-
-    await git.clone(repoUrl, appDir);
-    appendLog(id, `✅ Clone complete\n`);
-    bots.get(id).status = "installing";
-    io.emit("bots", Array.from(bots.values()));
-
-    appendLog(id, `📦 Running npm install...\n`);
-    await new Promise((resolve, reject) => {
-      const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], { cwd: appDir, shell: true });
-      npm.stdout.on("data", (d) => appendLog(id, d));
-      npm.stderr.on("data", (d) => appendLog(id, d));
-      npm.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`npm install failed (${code})`))));
+    await git.clone(repoUrl, dir);
+    log(id, `✅ Repo cloned from ${repoUrl}`);
+    exec(`cd ${dir} && npm install`, (err, out) => {
+      if (err) log(id, "❌ npm install failed");
+      else log(id, "✅ npm install complete");
     });
 
-    bots.get(id).status = "stopped";
-    appendLog(id, `✅ Ready to start.\n`);
-    io.emit("bots", Array.from(bots.values()));
-
-    res.json({ id, name: repoName });
+    bots.push({ id, name: name || id, entry, dir, repoUrl, proc: null });
+    res.json({ id, name: name || id });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e) });
+    res.json({ error: e.message });
   }
 });
 
-// === START ===
+// start bot
 app.post("/api/:id/start", (req, res) => {
-  const id = req.params.id;
-  const bot = bots.get(id);
-  if (!bot) return res.status(404).json({ error: "bot not found" });
-  if (bot.proc) return res.json({ message: "already running" });
+  const bot = bots.find(b => b.id === req.params.id);
+  if (!bot) return res.json({ error: "Bot not found" });
 
-  const entryPath = path.join(bot.dir, bot.entry);
-  if (!fs.existsSync(entryPath))
-    return res.status(400).json({ error: `entry file ${bot.entry} not found` });
+  if (bot.proc) return res.json({ error: "Already running" });
 
-  appendLog(id, `🚀 Starting bot: node ${bot.entry}\n`);
+  const proc = spawn("node", [join(bot.dir, bot.entry || "index.js")], { cwd: bot.dir });
+  bot.proc = proc;
   bot.startTime = Date.now();
-  bot.proc = spawnProcess(id, "node", [bot.entry], { cwd: bot.dir });
-  bot.status = "running";
-  io.emit("bots", Array.from(bots.values()));
-  res.json({ message: "started" });
+
+  proc.stdout.on("data", data => {
+    const msg = data.toString();
+    io.emit("log", msg);
+    log(bot.id, msg);
+  });
+  proc.stderr.on("data", data => {
+    const msg = data.toString();
+    io.emit("log", msg);
+    log(bot.id, msg);
+  });
+  proc.on("close", () => {
+    log(bot.id, "🔴 Bot stopped");
+    bot.proc = null;
+  });
+
+  log(bot.id, "🟢 Bot started");
+  res.json({ ok: true });
 });
 
-// === STOP ===
+// stop bot
 app.post("/api/:id/stop", (req, res) => {
-  const id = req.params.id;
-  const bot = bots.get(id);
-  if (!bot) return res.status(404).json({ error: "bot not found" });
-  if (!bot.proc) return res.json({ message: "not running" });
+  const bot = bots.find(b => b.id === req.params.id);
+  if (!bot) return res.json({ error: "Bot not found" });
 
-  bot.proc.kill();
-  bot.proc = null;
-  bot.status = "stopped";
-  delete bot.startTime;
-  appendLog(id, "🛑 Bot stopped\n");
-  io.emit("bots", Array.from(bots.values()));
-  res.json({ message: "stopped" });
-});
-
-// === UPDATE ===
-app.post("/api/:id/update", async (req, res) => {
-  const id = req.params.id;
-  const bot = bots.get(id);
-  if (!bot) return res.status(404).json({ error: "bot not found" });
-
-  appendLog(id, "🔁 Updating bot (git pull + npm install)...\n");
-  bot.status = "updating";
-  io.emit("bots", Array.from(bots.values()));
-
-  try {
-    const git = simpleGit(bot.dir);
-    await git.pull();
-    appendLog(id, "✅ Git pull complete\n");
-
-    await new Promise((resolve, reject) => {
-      const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], { cwd: bot.dir, shell: true });
-      npm.stdout.on("data", (d) => appendLog(id, d));
-      npm.stderr.on("data", (d) => appendLog(id, d));
-      npm.on("close", (code) => (code === 0 ? resolve() : reject(new Error("npm install failed"))));
-    });
-
-    appendLog(id, "🔁 Restarting after update...\n");
-    if (bot.proc) bot.proc.kill();
-    bot.proc = spawnProcess(id, "node", [bot.entry], { cwd: bot.dir });
-    bot.status = "running";
-    bot.startTime = Date.now();
-    io.emit("bots", Array.from(bots.values()));
-    appendLog(id, "✅ Update complete and restarted.\n");
-    res.json({ success: true });
-  } catch (err) {
-    appendLog(id, `❌ Update failed: ${err.message}\n`);
-    bot.status = "stopped";
-    io.emit("bots", Array.from(bots.values()));
-    res.status(500).json({ error: err.message });
+  if (bot.proc) {
+    bot.proc.kill("SIGTERM");
+    bot.proc = null;
+    log(bot.id, "🔴 Bot stopped manually");
   }
+  res.json({ ok: true });
 });
 
-// === LOGS ===
-app.get("/api/bots", (req, res) => res.json(Array.from(bots.values())));
+// restart bot
+app.post("/api/:id/restart", (req, res) => {
+  const bot = bots.find(b => b.id === req.params.id);
+  if (!bot) return res.json({ error: "Bot not found" });
+
+  if (bot.proc) bot.proc.kill("SIGTERM");
+  setTimeout(() => {
+    const proc = spawn("node", [join(bot.dir, bot.entry || "index.js")], { cwd: bot.dir });
+    bot.proc = proc;
+    bot.startTime = Date.now();
+    log(bot.id, "🔁 Bot restarted");
+    proc.stdout.on("data", d => io.emit("log", d.toString()));
+  }, 1000);
+
+  res.json({ ok: true });
+});
+
+// update bot (git pull + npm install + restart)
+app.post("/api/:id/update", (req, res) => {
+  const bot = bots.find(b => b.id === req.params.id);
+  if (!bot) return res.json({ error: "Bot not found" });
+  const dir = bot.dir;
+
+  log(bot.id, "⬆️ Starting update...");
+  const git = simpleGit(dir);
+  git.pull()
+    .then(() => {
+      log(bot.id, "✅ Git pull done");
+      exec(`cd ${dir} && npm install`, (err) => {
+        if (err) {
+          log(bot.id, "❌ npm install failed");
+          return res.json({ error: "npm install failed" });
+        }
+        log(bot.id, "✅ npm install done");
+        if (bot.proc) bot.proc.kill("SIGTERM");
+        setTimeout(() => {
+          const proc = spawn("node", [join(bot.dir, bot.entry || "index.js")], { cwd: bot.dir });
+          bot.proc = proc;
+          bot.startTime = Date.now();
+          log(bot.id, "♻️ Bot updated & restarted");
+          proc.stdout.on("data", d => io.emit("log", d.toString()));
+        }, 1000);
+        res.json({ ok: true });
+      });
+    })
+    .catch(e => {
+      log(bot.id, "❌ Git pull failed: " + e.message);
+      res.json({ error: e.message });
+    });
+});
+
+// logs
 app.get("/api/:id/logs", (req, res) => {
-  const bot = bots.get(req.params.id);
-  if (!bot) return res.status(404).json({ error: "bot not found" });
-  res.json({ logs: bot.logs.slice(-1000) });
+  const f = logFile(req.params.id);
+  if (!existsSync(f)) return res.json({ logs: [] });
+  const data = readFileSync(f, "utf-8").split("\n").slice(-400);
+  res.json({ logs: data });
 });
 
-// === SOCKETS ===
-io.on("connection", (socket) => {
-  socket.on("subscribe", (id) => {
-    const bot = bots.get(id);
-    if (!bot) return socket.emit("error", "bot not found");
-    socket.join(id);
-    socket.emit("init", bot.logs.join(""));
+// === SOCKET.IO ===
+io.on("connection", socket => {
+  console.log("🟢 client connected");
+  socket.on("subscribe", botId => {
+    const f = logFile(botId);
+    if (existsSync(f)) socket.emit("log", readFileSync(f, "utf-8"));
   });
 });
 
-app.get("/", (_, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ HEADSHOT PANEL v3.7 running on port ${PORT}`));
+// === START SERVER ===
+server.listen(PORT, () => {
+  console.log(`🚀 HEADSHOT PANEL running on port ${PORT}`);
+});
