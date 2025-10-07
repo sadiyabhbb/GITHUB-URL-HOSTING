@@ -248,4 +248,4 @@ io.on("connection", socket => {
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`HEADSHOT PANEL running on port ${PORT}`));
+server.listen(PORT, () => console.log(`HEADSHOT PANEL v4.3 running on port ${PORT}`));
