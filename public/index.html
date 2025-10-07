@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Xavia Panel v4.7</title>
+  <title>Likhon Headshot Panel V2</title>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <style>
@@ -167,7 +167,7 @@
   <div id="overlay"></div>
 
   <aside id="sidebar">
-    <h2 style="color:#58a6ff;">Xavia Panel</h2>
+    <h2 style="color:#58a6ff;">Server Panel</h2>
     <button class="btn" id="btnServers">Servers</button>
     <button class="btn" id="btnCreate">Create Bot</button>
     <button class="btn ghost" id="btnRefresh">Refresh</button>
@@ -176,7 +176,7 @@
   <main id="main">
     <header>
       <button id="menuBtn">☰</button>
-      <h2>Xavia Control</h2>
+      <h2>Server Panel</h2>
     </header>
 
     <section id="serversSection">
@@ -184,7 +184,7 @@
       <div id="serverSummary" style="color:#8b949e;font-size:14px;margin:0.4rem 0;">Loading...</div>
       <div id="cards"></div>
 
-      <h3 style="margin-top:2rem;">Host & Config Info</h3>
+      <h3 style="margin-top:2rem;">Host Info</h3>
       <div id="infoBox" class="json-box">Loading host info...</div>
     </section>
 
@@ -294,7 +294,7 @@
       serverSummary.textContent=`${list.length} total bots • ${list.filter(x=>x.status==='running').length} running`;
       list.forEach(b=>{
         const c=document.createElement('div');c.className='card';
-        // Use data attributes and proper event listeners instead of inline onclick for safety
+      
         c.innerHTML=`
           <div class="card-head">
             <div>
@@ -311,7 +311,7 @@
             <button class="btn danger btn-delete">Delete</button>
             <button class="btn ghost btn-logs">Logs</button>
           </div>`;
-        // attach event listeners
+        
         c.querySelector('.btn-start').onclick = ()=>fetch(`/api/${b.id}/start`,{method:'POST'}).then(()=>loadBots());
         c.querySelector('.btn-stop').onclick = ()=>fetch(`/api/${b.id}/stop`,{method:'POST'}).then(()=>loadBots());
         c.querySelector('.btn-restart').onclick = ()=>fetch(`/api/${b.id}/restart`,{method:'POST'}).then(()=>loadBots());
@@ -328,10 +328,10 @@
       modalTitle.textContent='Server Console — '+name;
       modalMeta.textContent='attached: '+name;
       modalLog.textContent='Loading logs...';
-      // ask server to add socket to room
+      
       socket.emit('attachConsole', id);
-      // server will send initLogs
-      // also fetch last logs as fallback (in case)
+      
+      
       fetch('/api/'+id+'/logs')
         .then(r=>r.json())
         .then(j=>{ if(!attachedId) return; modalLog.textContent = (j.logs||[]).join(''); modalLog.scrollTop = modalLog.scrollHeight; });
@@ -341,7 +341,7 @@
       if(attachedId) socket.emit('detachConsole', attachedId);
       modal.classList.remove('show');
       attachedId=null;
-      // clear URL hash when closing
+      
       if(location.hash && location.hash.startsWith('#bot-')) history.replaceState(null, '', location.pathname + location.search);
     }
     modalClose.onclick=closeModal;
@@ -405,15 +405,15 @@
         .then(updateInfo);
     }
 
-    // --- INIT ---
-    // show servers by default so visiting root or refreshing shows the server panel
+   
+   
     showSection('servers');
 
-    // handle URL hash for auto-opening a bot's console: #bot-<id>
+  
     function checkHashOnLoad(){
       if(location.hash && location.hash.startsWith('#bot-')){
         const id = location.hash.replace('#bot-','');
-        // wait a bit for bots list to render, then open modal if id exists
+        
         setTimeout(()=>{
           const found = bots.find(b=>b.id===id);
           if(found){
@@ -423,13 +423,13 @@
       }
     }
 
-    // load and then check hash
+    
     loadBots().then(checkHashOnLoad);
 
-    // keep host info updated
+    
     setInterval(updateInfo,5000);
 
-    // clean up socket room join on disconnect (optional)
+    
     window.addEventListener('beforeunload', ()=>{
       if(attachedId) socket.emit('detachConsole', attachedId);
     });
