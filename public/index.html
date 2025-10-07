@@ -3,144 +3,116 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LIKHON HEADSHOT PANEL v3.7</title>
-  <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/906/906343.png">
+  <title>HEADSHOT PANEL v3.8</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <style>
+    * {margin:0; padding:0; box-sizing:border-box; font-family:"Poppins",sans-serif;}
     body {
-      font-family: "Poppins", sans-serif;
-      background: #0e0e10;
-      color: #fff;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
+      background:#0b0b0f;
+      color:#fff;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      min-height:100vh;
+      padding:15px;
     }
-
     header {
-      width: 100%;
-      background: linear-gradient(90deg, #ff0055, #7b2ff7);
-      color: white;
-      text-align: center;
-      padding: 15px 10px;
-      font-size: 1.4rem;
-      font-weight: 600;
-      letter-spacing: 1px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+      width:100%;
+      text-align:center;
+      font-size:1.5rem;
+      font-weight:600;
+      color:#00ffc6;
+      letter-spacing:1px;
+      margin-bottom:15px;
     }
-
-    .container {
-      width: 95%;
-      max-width: 1000px;
-      background: #1c1c20;
-      border-radius: 12px;
-      padding: 20px;
-      margin-top: 20px;
-      box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+    .panel {
+      background:rgba(255,255,255,0.05);
+      backdrop-filter:blur(10px);
+      border:1px solid rgba(255,255,255,0.1);
+      border-radius:12px;
+      width:100%;
+      max-width:900px;
+      padding:20px;
+      box-shadow:0 0 20px rgba(0,255,200,0.08);
     }
-
-    .input-area {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+    .deploy-box {
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-bottom:20px;
     }
-
     input {
-      padding: 10px;
-      border-radius: 8px;
-      border: none;
-      outline: none;
-      background: #2a2a2f;
-      color: #fff;
-      font-size: 14px;
+      background:#141418;
+      border:none;
+      color:#fff;
+      padding:10px;
+      border-radius:8px;
+      outline:none;
     }
-
     button {
-      background: linear-gradient(90deg, #7b2ff7, #ff0055);
-      border: none;
-      padding: 10px 16px;
-      border-radius: 8px;
-      color: white;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.3s;
+      background:#00ffc6;
+      color:#000;
+      font-weight:600;
+      border:none;
+      padding:10px;
+      border-radius:8px;
+      cursor:pointer;
+      transition:0.2s;
     }
-
-    button:hover {
-      opacity: 0.9;
-      transform: scale(1.02);
-    }
-
-    .bots {
-      margin-top: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
+    button:hover { background:#00d9aa; }
+    .bots {display:flex; flex-direction:column; gap:15px;}
     .bot {
-      background: #2a2a2f;
-      padding: 12px;
-      border-radius: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      border: 1px solid #3b3b3f;
+      background:#141418;
+      padding:15px;
+      border-radius:10px;
+      border:1px solid #1f1f23;
     }
-
     .bot-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom:10px;
     }
-
-    .bot-header h3 {
-      margin: 0;
-      font-size: 1rem;
-      color: #ff3377;
+    .bot-name {font-size:1rem; font-weight:600; color:#00ffc6;}
+    .actions {display:flex; flex-wrap:wrap; gap:6px;}
+    .actions button {
+      background:#1f1f23;
+      color:#00ffc6;
+      border:1px solid #00ffc6;
+      font-size:13px;
+      padding:6px 10px;
     }
-
-    .actions {
-      display: flex;
-      gap: 5px;
-      flex-wrap: wrap;
-    }
-
+    .actions button:hover {background:#00ffc6; color:#000;}
     .logs {
-      background: #000;
-      color: #fff;
-      padding: 10px;
-      font-family: monospace;
-      font-size: 13px;
-      border-radius: 6px;
-      max-height: 300px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      border: 1px solid #3b3b3f;
-      margin-top: 6px;
+      background:#000;
+      color:#fff;
+      font-family:monospace;
+      font-size:13px;
+      padding:10px;
+      border-radius:8px;
+      max-height:300px;
+      overflow-y:auto;
+      white-space:pre-wrap;
+      border:1px solid #1f1f23;
     }
-
-    @media (max-width: 600px) {
-      .logs {
-        max-height: 250px;
-        font-size: 12px;
-      }
-      .bot-header h3 { font-size: 0.9rem; }
-      button { font-size: 12px; padding: 8px 10px; }
+    small {color:#aaa;}
+    @media(max-width:600px){
+      header{font-size:1.2rem;}
+      .logs{max-height:250px;font-size:12px;}
+      .bot-header{flex-direction:column;align-items:flex-start;gap:5px;}
     }
   </style>
 </head>
 <body>
-  <header>💀 LIKHON HEADSHOT PANEL v3.7 💀</header>
-  <div class="container">
-    <div class="input-area">
-      <input id="repoUrl" placeholder="GitHub Repo URL (e.g. https://github.com/user/bot.git)" />
-      <input id="botName" placeholder="Bot Name (optional)" />
-      <button id="deployBtn">🚀 Deploy Bot</button>
+  <header>LIKHON HEADSHOT PANEL</header>
+  <div class="panel">
+    <div class="deploy-box">
+      <input id="repoUrl" placeholder="Enter GitHub Repo URL (https://github.com/user/bot.git)">
+      <input id="botName" placeholder="Bot Name (optional)">
+      <button onclick="deployBot()">Deploy Bot</button>
     </div>
-    <div class="bots" id="bots"></div>
+    <div id="bots" class="bots"></div>
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -148,103 +120,81 @@
     const socket = io();
     const botsDiv = document.getElementById("bots");
 
-    async function loadBots() {
+    async function loadBots(){
       const res = await fetch("/api/bots");
       const bots = await res.json();
       renderBots(bots);
     }
 
-    async function deploy() {
-      const repoUrl = document.getElementById("repoUrl").value.trim();
-      const botName = document.getElementById("botName").value.trim();
-      if (!repoUrl) return alert("Please enter a repo URL");
-      const res = await fetch("/api/deploy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoUrl, name: botName })
-      });
-      if (res.ok) {
-        alert("✅ Deploy started!");
-        loadBots();
-      } else {
-        alert("❌ Deploy failed!");
-      }
+    async function deployBot(){
+      const repoUrl=document.getElementById("repoUrl").value.trim();
+      const botName=document.getElementById("botName").value.trim();
+      if(!repoUrl)return alert("Enter a repository URL");
+      const res=await fetch("/api/deploy",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({repoUrl,name:botName})});
+      alert(res.ok?"✅ Deploy started!":"❌ Failed to deploy");
+      loadBots();
     }
 
-    function uptime(startTime) {
-      if (!startTime) return "";
-      const diff = Date.now() - startTime;
-      const s = Math.floor(diff / 1000) % 60;
-      const m = Math.floor(diff / (1000 * 60)) % 60;
-      const h = Math.floor(diff / (1000 * 60 * 60));
-      return `${h}h ${m}m ${s}s`;
-    }
-
-    function renderBots(bots) {
-      botsDiv.innerHTML = "";
-      bots.forEach(bot => {
-        const el = document.createElement("div");
-        el.className = "bot";
-        el.innerHTML = `
+    function renderBots(bots){
+      botsDiv.innerHTML="";
+      bots.forEach(bot=>{
+        const el=document.createElement("div");
+        el.className="bot";
+        el.innerHTML=`
           <div class="bot-header">
-            <h3>${bot.name}</h3>
+            <div class="bot-name">${bot.name}</div>
             <div class="actions">
-              <button onclick="startBot('${bot.id}')">▶️ Start</button>
-              <button onclick="stopBot('${bot.id}')">⏹ Stop</button>
-              <button onclick="restartBot('${bot.id}')">🔁 Restart</button>
-              <button onclick="updateBot('${bot.id}')">⬆️ Update</button>
-              <button onclick="attachLogs('${bot.id}')">📜 Attach</button>
+              <button onclick="startBot('${bot.id}')">Start</button>
+              <button onclick="stopBot('${bot.id}')">Stop</button>
+              <button onclick="restartBot('${bot.id}')">Restart</button>
+              <button onclick="updateBot('${bot.id}')">Update</button>
+              <button onclick="attachLogs('${bot.id}')">Attach</button>
             </div>
           </div>
-          <small>Status: ${bot.status} ${bot.startTime ? " | ⏱ " + uptime(bot.startTime) : ""}</small>
-          <div class="logs" id="log-${bot.id}">Loading logs...</div>
+          <small>Status: ${bot.status}${bot.startTime?" | Uptime: "+formatUptime(bot.startTime):""}</small>
+          <div id="log-${bot.id}" class="logs"></div>
         `;
         botsDiv.appendChild(el);
         loadLogs(bot.id);
       });
     }
 
-    async function loadLogs(id) {
-      const res = await fetch(`/api/${id}/logs`);
-      const data = await res.json();
-      const logEl = document.getElementById("log-" + id);
-      logEl.textContent = data.logs.join("");
-      logEl.scrollTop = logEl.scrollHeight;
+    function formatUptime(startTime){
+      if(!startTime)return"";
+      const diff=Date.now()-startTime;
+      const s=Math.floor(diff/1000)%60;
+      const m=Math.floor(diff/60000)%60;
+      const h=Math.floor(diff/3600000);
+      return `${h}h ${m}m ${s}s`;
     }
 
-    function attachLogs(id) {
-      socket.emit("subscribe", id);
-      const logEl = document.getElementById("log-" + id);
-      socket.on("log", (txt) => {
-        logEl.textContent += txt;
-        logEl.scrollTop = logEl.scrollHeight;
+    async function loadLogs(id){
+      const res=await fetch(`/api/${id}/logs`);
+      const data=await res.json();
+      const logEl=document.getElementById("log-"+id);
+      logEl.textContent=data.logs.join("");
+      logEl.scrollTop=logEl.scrollHeight;
+    }
+
+    function attachLogs(id){
+      socket.emit("subscribe",id);
+      const logEl=document.getElementById("log-"+id);
+      socket.on("log",txt=>{
+        logEl.textContent+=txt;
+        logEl.scrollTop=logEl.scrollHeight;
       });
     }
 
-    async function startBot(id) {
-      await fetch(`/api/${id}/start`, { method: "POST" });
-      loadBots();
-    }
-    async function stopBot(id) {
-      await fetch(`/api/${id}/stop`, { method: "POST" });
-      loadBots();
-    }
-    async function restartBot(id) {
-      await fetch(`/api/${id}/restart`, { method: "POST" });
-      loadBots();
-    }
-    async function updateBot(id) {
-      alert("⏳ Updating bot, please wait...");
-      const res = await fetch(`/api/${id}/update`, { method: "POST" });
-      if (res.ok) {
-        alert("✅ Update complete!");
-      } else {
-        alert("❌ Update failed!");
-      }
+    async function startBot(id){await fetch(`/api/${id}/start`,{method:"POST"});loadBots();}
+    async function stopBot(id){await fetch(`/api/${id}/stop`,{method:"POST"});loadBots();}
+    async function restartBot(id){await fetch(`/api/${id}/restart`,{method:"POST"});loadBots();}
+    async function updateBot(id){
+      alert("⏳ Updating bot...");
+      const res=await fetch(`/api/${id}/update`,{method:"POST"});
+      alert(res.ok?"✅ Updated Successfully!":"❌ Update Failed!");
       loadBots();
     }
 
-    document.getElementById("deployBtn").addEventListener("click", deploy);
     loadBots();
   </script>
 </body>
