@@ -4,6 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>HEADSHOT PANEL v4.7</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Poppins:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root{
       --bg: #050c12;
@@ -16,47 +17,38 @@
       --glass: rgba(255,255,255,0.02);
       --font: "Inter", system-ui, -apple-system, "Poppins", sans-serif;
     }
-    *{box-sizing:border-box}
+    *{box-sizing:border-box;margin:0;padding:0}
     body{
-      margin:0;
-      background: linear-gradient(180deg,var(--bg),#071018);
+      background:linear-gradient(180deg,var(--bg),#071018);
       color:#eaf2f3;
       font-family:var(--font);
       -webkit-font-smoothing:antialiased;
       -moz-osx-font-smoothing:grayscale;
     }
 
-    /* Header */
     header{
-      background: var(--panel);
+      background:var(--panel);
       padding:14px 16px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
+      display:flex;align-items:center;justify-content:space-between;
       border-bottom:1px solid rgba(255,255,255,0.04);
     }
     .brand h1{margin:0;color:var(--accent-a);font-size:18px}
     .brand small{color:var(--muted);font-size:12px}
     .menu-btn{background:transparent;border:none;color:var(--accent-a);font-size:22px;cursor:pointer}
 
-    /* Sidebar */
-    .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);backdrop-filter: blur(3px);opacity:0;pointer-events:none;transition:opacity .25s;z-index:80}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.25s;z-index:80}
     .overlay.show{opacity:1;pointer-events:auto}
-    .sidebar{
-      position:fixed;left:-260px;top:0;height:100%;width:260px;background:rgba(15,20,24,0.98);
-      padding:28px 16px;display:flex;flex-direction:column;gap:12px;transition:left .28s;z-index:90;border-right:1px solid var(--glass)
-    }
+    .sidebar{position:fixed;left:-260px;top:0;height:100%;width:260px;background:rgba(15,20,24,0.98);
+      padding:28px 16px;display:flex;flex-direction:column;gap:12px;transition:left .28s;z-index:90;border-right:1px solid var(--glass)}
     .sidebar.show{left:0}
     .sidebar button{background:transparent;border:none;color:var(--muted);text-align:left;padding:10px;border-radius:8px;cursor:pointer;font-weight:600}
     .sidebar button:hover{color:var(--accent-a);background:rgba(255,255,255,0.02);transform:translateX(6px);transition:.14s}
 
-    /* Layout */
-    .wrap{max-width:1100px;margin:20px auto;padding:0 14px;display:grid;grid-template-columns:1fr;gap:16px}
+    .wrap{max-width:1100px;margin:20px auto;padding:0 14px;display:grid;gap:16px}
     .panel{background:var(--panel);padding:14px;border-radius:12px;border:1px solid var(--glass);box-shadow:0 8px 30px rgba(0,0,0,0.45)}
     .title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
     .meta{color:var(--muted);font-size:13px}
 
-    /* Bot cards list */
     .cards{display:flex;flex-direction:column;gap:12px;max-height:46vh;overflow:auto;padding-right:6px}
     .card{background:var(--card);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
     .card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -68,382 +60,171 @@
     .btn.accent{background:linear-gradient(90deg,var(--accent-a),var(--accent-b));color:#001}
     .btn.danger{background:var(--danger);color:#fff}
 
-    /* Main info console (JSON) */
-    .info-console{
-      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    .info-console{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
       border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.03);
-      font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
-      font-size:13px;
-    }
-    .json-box{
-      background:#000;padding:14px;border-radius:8px;color:#fff;white-space:pre-wrap;overflow:auto;height:140px;border:1px solid rgba(255,255,255,0.03)
-    }
-    /* Neon gradient animated text */
+      font-family:ui-monospace,monospace;font-size:13px}
+    .json-box{background:#000;padding:14px;border-radius:8px;color:#fff;white-space:pre-wrap;overflow:auto;height:150px;border:1px solid rgba(255,255,255,0.03)}
+
     .neon-text{
       font-weight:700;
-      background: linear-gradient(90deg, #00ffd1, #00b3ff, #a770ff, #ff7bd1);
-      background-size: 300% 100%;
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      animation: neon 6s linear infinite;
+      background:linear-gradient(90deg,#00ffd1,#00b3ff,#a770ff,#ff7bd1);
+      background-size:300% 100%;
+      -webkit-background-clip:text;
+      color:transparent;
+      animation:neon 6s linear infinite;
     }
-    @keyframes neon{
-      0%{background-position:0% 50%}
-      50%{background-position:100% 50%}
-      100%{background-position:0% 50%}
-    }
+    @keyframes neon{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 
-    /* Modal console (per-server) */
-    .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:200;opacity:0;pointer-events:none;transition:opacity .18s}
+    .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:200;opacity:0;pointer-events:none;transition:.18s}
     .modal.show{opacity:1;pointer-events:auto}
     .modal-card{width:min(980px,96%);max-height:86vh;background:var(--panel);border-radius:12px;padding:12px;border:1px solid var(--glass);display:flex;flex-direction:column}
     .modal-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:8px}
     .modal-log{background:#000;color:#e6f0f2;padding:12px;border-radius:8px;overflow:auto;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:13px;flex:1;border:1px solid rgba(255,255,255,0.03)}
-    .modal-actions{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
 
-    /* small responsiveness */
-    @media (max-width:920px){
-      .json-box{height:120px}
-      .modal-card{width:95%}
-    }
-    @media (max-width:520px){
-      .json-box{height:100px}
-      .card-actions{gap:6px}
-      .btn{padding:7px 10px;font-size:13px}
-    }
+    @media(max-width:920px){.json-box{height:120px}}
+    @media(max-width:520px){.json-box{height:100px}.btn{padding:7px 10px;font-size:13px}}
   </style>
 </head>
 <body>
-  <header>
-    <div class="brand">
-      <h1>HEADSHOT PANEL</h1>
-      <small class="meta">v4.7 • Neon Dynamic</small>
-    </div>
-    <div>
-      <button id="menuBtn" class="menu-btn">☰</button>
-    </div>
-  </header>
-
-  <div id="overlay" class="overlay"></div>
-  <aside id="sidebar" class="sidebar" aria-hidden="true">
-    <button id="btnServers">Servers</button>
-    <button id="btnCreate">Create Server</button>
-    <button id="btnRefresh">Refresh</button>
-  </aside>
-
-  <main class="wrap">
-    <section class="panel" id="serversSection">
-      <div class="title-row">
-        <div>
-          <div style="font-weight:800;color:var(--accent-a)">Servers</div>
-          <div class="meta" id="serverSummary">Loading...</div>
-        </div>
-        <div class="meta" id="runningCount"></div>
-      </div>
-
-      <div class="cards" id="cards"></div>
-    </section>
-
-    <section class="panel" id="createSection" style="display:none">
-      <div style="font-weight:800;color:var(--accent-a)">Create Server</div>
-      <div style="height:10px"></div>
-      <input id="repo" placeholder="Git repo URL" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--glass);background:var(--card);color:#e6f0f2;margin-bottom:8px">
-      <input id="entry" placeholder="Entry (index.js)" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--glass);background:var(--card);color:#e6f0f2;margin-bottom:8px">
-      <input id="name" placeholder="Bot name (optional)" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--glass);background:var(--card);color:#e6f0f2;margin-bottom:8px">
-      <div style="display:flex;gap:8px">
-        <button id="createBtn" class="btn accent">Create</button>
-        <button id="cancelCreate" class="btn ghost">Cancel</button>
-      </div>
-    </section>
-
-    <section class="panel info-console">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-weight:800;color:var(--accent-a)">Host & Config Info</div>
-        <div class="meta">Auto info • JSON</div>
-      </div>
-      <div class="json-box" id="infoBox" aria-live="polite"><span class="neon-text">Loading host info...</span></div>
-    </section>
-  </main>
-
-  <!-- Modal for per-server console -->
-  <div id="modal" class="modal" aria-hidden="true">
-    <div class="modal-card">
-      <div class="modal-head">
-        <div>
-          <div id="modalTitle" style="font-weight:800;color:var(--accent-a)">Logs</div>
-          <div id="modalMeta" class="meta">attached: -</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button id="modalCopy" class="btn ghost">Copy</button>
-          <button id="modalClear" class="btn ghost">Clear</button>
-          <button id="modalClose" class="btn danger">Close</button>
-        </div>
-      </div>
-      <div id="modalLog" class="modal-log">No logs yet. Attach a bot from the list.</div>
-      <div class="modal-actions"></div>
-    </div>
+<header>
+  <div class="brand">
+    <h1>HEADSHOT PANEL</h1>
+    <small class="meta">v4.7 • Neon Dynamic</small>
   </div>
+  <button id="menuBtn" class="menu-btn">☰</button>
+</header>
+
+<div id="overlay" class="overlay"></div>
+<aside id="sidebar" class="sidebar">
+  <button id="btnServers">Servers</button>
+  <button id="btnCreate">Create Server</button>
+  <button id="btnRefresh">Refresh</button>
+</aside>
+
+<main class="wrap">
+  <section class="panel" id="serversSection">
+    <div class="title-row">
+      <div>
+        <div style="font-weight:800;color:var(--accent-a)">Servers</div>
+        <div class="meta" id="serverSummary">Loading...</div>
+      </div>
+      <div class="meta" id="runningCount"></div>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="panel" id="createSection" style="display:none">
+    <div style="font-weight:800;color:var(--accent-a)">Create Server</div>
+    <div style="height:10px"></div>
+    <input id="repo" placeholder="Git repo URL" class="input">
+    <input id="entry" placeholder="Entry (index.js)" class="input">
+    <input id="name" placeholder="Bot name (optional)" class="input">
+    <div style="display:flex;gap:8px">
+      <button id="createBtn" class="btn accent">Create</button>
+      <button id="cancelCreate" class="btn ghost">Cancel</button>
+    </div>
+  </section>
+
+  <section class="panel info-console">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-weight:800;color:var(--accent-a)">Host & Config Info</div>
+      <div class="meta">Auto info • JSON</div>
+    </div>
+    <div class="json-box" id="infoBox"><span class="neon-text">Loading host info...</span></div>
+  </section>
+</main>
+
+<div id="modal" class="modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div id="modalTitle" style="font-weight:800;color:var(--accent-a)">Logs</div>
+        <div id="modalMeta" class="meta">attached: -</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="modalCopy" class="btn ghost">Copy</button>
+        <button id="modalClear" class="btn ghost">Clear</button>
+        <button id="modalClose" class="btn danger">Close</button>
+      </div>
+    </div>
+    <div id="modalLog" class="modal-log">No logs yet. Attach a bot from the list.</div>
+  </div>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 (function(){
   const socket = io();
-  const menuBtn = document.getElementById('menuBtn');
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('overlay');
-  const btnServers = document.getElementById('btnServers');
-  const btnCreate = document.getElementById('btnCreate');
-  const btnRefresh = document.getElementById('btnRefresh');
-
-  const cardsEl = document.getElementById('cards');
-  const serverSummary = document.getElementById('serverSummary');
-  const runningCount = document.getElementById('runningCount');
-
-  const createSection = document.getElementById('createSection');
-  const serversSection = document.getElementById('serversSection');
-  const repoInput = document.getElementById('repo');
-  const entryInput = document.getElementById('entry');
-  const nameInput = document.getElementById('name');
-  const createBtn = document.getElementById('createBtn');
-  const cancelCreate = document.getElementById('cancelCreate');
-
+  const cards = document.getElementById('cards');
   const infoBox = document.getElementById('infoBox');
+  const menuBtn=document.getElementById('menuBtn'),sidebar=document.getElementById('sidebar'),overlay=document.getElementById('overlay');
+  const btnServers=document.getElementById('btnServers'),btnCreate=document.getElementById('btnCreate'),btnRefresh=document.getElementById('btnRefresh');
+  const createSection=document.getElementById('createSection'),serversSection=document.getElementById('serversSection');
+  const repo=document.getElementById('repo'),entry=document.getElementById('entry'),name=document.getElementById('name');
+  const createBtn=document.getElementById('createBtn'),cancelCreate=document.getElementById('cancelCreate');
+  const modal=document.getElementById('modal'),modalLog=document.getElementById('modalLog'),modalTitle=document.getElementById('modalTitle'),modalMeta=document.getElementById('modalMeta');
+  const modalCopy=document.getElementById('modalCopy'),modalClear=document.getElementById('modalClear'),modalClose=document.getElementById('modalClose');
+  let attachedId=null,bots=[];
 
-  const modal = document.getElementById('modal');
-  const modalLog = document.getElementById('modalLog');
-  const modalTitle = document.getElementById('modalTitle');
-  const modalMeta = document.getElementById('modalMeta');
-  const modalCopy = document.getElementById('modalCopy');
-  const modalClear = document.getElementById('modalClear');
-  const modalClose = document.getElementById('modalClose');
+  function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
+  function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
+  menuBtn.onclick=openSidebar;overlay.onclick=()=>{closeSidebar();closeModal();};
+  btnServers.onclick=()=>{showSection('servers');closeSidebar();};
+  btnCreate.onclick=()=>{showSection('create');closeSidebar();};
+  btnRefresh.onclick=()=>{loadBots();closeSidebar();};
 
-  let bots = [];
-  let attachedId = null;
+  function showSection(n){createSection.style.display=(n==='create'?'block':'none');serversSection.style.display=(n==='create'?'none':'block');}
+  async function api(path,method='POST',body){return fetch(path,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):null}).then(r=>r.json());}
 
-  function openSidebar(){ sidebar.classList.add('show'); overlay.classList.add('show'); sidebar.setAttribute('aria-hidden','false'); }
-  function closeSidebar(){ sidebar.classList.remove('show'); overlay.classList.remove('show'); sidebar.setAttribute('aria-hidden','true'); }
-
-  menuBtn.addEventListener('click', ()=> openSidebar());
-  overlay.addEventListener('click', ()=> { closeSidebar(); closeModal(); });
-
-  btnServers.addEventListener('click', ()=> { showSection('servers'); closeSidebar(); });
-  btnCreate.addEventListener('click', ()=> { showSection('create'); closeSidebar(); });
-  btnRefresh.addEventListener('click', ()=> { loadBots(); closeSidebar(); });
-
-  function showSection(n){
-    if(n==='create'){ createSection.style.display='block'; serversSection.style.display='none'; }
-    else { createSection.style.display='none'; serversSection.style.display='block'; }
-  }
-
-  async function apiPost(path, body){
-    const res = await fetch(path, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body||{}) });
-    return res.json();
-  }
-  async function apiDelete(path){
-    const res = await fetch(path, { method:'DELETE' });
-    return res.json();
-  }
-
-  createBtn.onclick = async () => {
-    const repo = repoInput.value.trim(); if(!repo) return;
-    const entry = entryInput.value.trim() || 'index.js';
-    const name = nameInput.value.trim();
-    createBtn.disabled = true; createBtn.textContent = 'Creating...';
-    await apiPost('/api/deploy', { repoUrl: repo, name, entry });
-    repoInput.value = entryInput.value = nameInput.value = '';
-    createBtn.disabled = false; createBtn.textContent = 'Create';
-    showSection('servers'); loadBots();
+  createBtn.onclick=async()=>{
+    if(!repo.value.trim())return;
+    createBtn.disabled=true;createBtn.textContent='Creating...';
+    await api('/api/deploy','POST',{repoUrl:repo.value.trim(),entry:entry.value.trim()||'index.js',name:name.value.trim()});
+    repo.value=entry.value=name.value='';createBtn.disabled=false;createBtn.textContent='Create';showSection('servers');loadBots();
   };
-  cancelCreate.onclick = () => showSection('servers');
+  cancelCreate.onclick=()=>showSection('servers');
 
-  // Build card list
   function renderCards(list){
-    bots = list || [];
-    cardsEl.innerHTML = '';
-    let running = 0;
+    bots=list||[];cards.innerHTML='';
     list.forEach(b=>{
-      if(b.status === 'running') running++;
-      const card = document.createElement('div'); card.className = 'card';
-      card.innerHTML = `
-        <div class="card-head">
-          <div>
-            <div class="card-title">${escapeHtml(b.name)}</div>
-            <div class="card-sub">${escapeHtml(b.entry || 'index.js')}</div>
-          </div>
-          <div class="meta">${b.status === 'running' ? 'running' : 'stopped'}</div>
-        </div>
+      const c=document.createElement('div');c.className='card';
+      c.innerHTML=`
+        <div class="card-head"><div><div class="card-title">${b.name}</div><div class="card-sub">${b.entry}</div></div><div class="meta">${b.status}</div></div>
         <div class="card-actions">
-          <button class="btn ghost start">Start</button>
-          <button class="btn ghost stop">Stop</button>
-          <button class="btn ghost restart">Restart</button>
-          <button class="btn ghost update">Update</button>
-          <button class="btn danger delete">Delete</button>
-          <button class="btn ghost logs">Logs</button>
-        </div>
-        <div id="err-${b.id}" style="margin-top:8px;color:#f1a0a0;font-size:13px;display:none"></div>
-      `;
-      // actions
-      card.querySelector('.start').onclick = ()=> apiPost(`/api/${b.id}/start`).then(loadBots);
-      card.querySelector('.stop').onclick = ()=> apiPost(`/api/${b.id}/stop`).then(loadBots);
-      card.querySelector('.restart').onclick = ()=> apiPost(`/api/${b.id}/restart`).then(loadBots);
-      card.querySelector('.update').onclick = ()=> apiPost(`/api/${b.id}/update`).then(loadBots);
-      card.querySelector('.delete').onclick = ()=> {
-        if(!confirm('Delete this bot?')) return;
-        apiDelete(`/api/${b.id}/delete`).then(loadBots);
-      };
-      card.querySelector('.logs').onclick = ()=> openModalFor(b.id, b.name);
-
-      cardsEl.appendChild(card);
+          <button class="btn ghost" onclick="fetch('/api/${b.id}/start',{method:'POST'}).then(()=>loadBots())">Start</button>
+          <button class="btn ghost" onclick="fetch('/api/${b.id}/stop',{method:'POST'}).then(()=>loadBots())">Stop</button>
+          <button class="btn ghost" onclick="fetch('/api/${b.id}/restart',{method:'POST'}).then(()=>loadBots())">Restart</button>
+          <button class="btn ghost" onclick="fetch('/api/${b.id}/update',{method:'POST'}).then(()=>loadBots())">Update</button>
+          <button class="btn danger" onclick="fetch('/api/${b.id}/delete',{method:'DELETE'}).then(()=>loadBots())">Delete</button>
+          <button class="btn ghost" onclick="openModal('${b.id}','${b.name}')">Logs</button>
+        </div>`;
+      cards.appendChild(c);
     });
-    serverSummary.textContent = `${running} running • ${list.length} total`;
-    runningCount.textContent = `Running: ${running}`;
   }
 
-  function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+  function openModal(id,name){attachedId=id;modal.classList.add('show');modalTitle.textContent='Server Console — '+name;modalMeta.textContent='attached: '+name;modalLog.textContent='Loading logs...';socket.emit('subscribe',id);fetch('/api/'+id+'/logs').then(r=>r.json()).then(j=>{modalLog.textContent=(j.logs||[]).join('');});}
+  function closeModal(){modal.classList.remove('show');attachedId=null;}
+  modalClose.onclick=closeModal;
+  modalCopy.onclick=async()=>{await navigator.clipboard.writeText(modalLog.textContent);modalCopy.textContent='Copied';setTimeout(()=>modalCopy.textContent='Copy',800);}
+  modalClear.onclick=()=>modalLog.textContent='';
 
-  // Modal / per-server console
-  async function openModalFor(id, name){
-    attachedId = id;
-    modal.classList.add('show');
-    modal.setAttribute('aria-hidden','false');
-    modalTitle.textContent = `Server Console — ${name}`;
-    modalMeta.textContent = `attached: ${name}`;
-    modalLog.textContent = 'Loading logs...';
+  socket.on('bots',renderCards);
+  socket.on('log',({id,text})=>{if(attachedId===id){modalLog.textContent+=text;modalLog.scrollTop=modalLog.scrollHeight;}});
 
-    // fetch recent logs
-    try {
-      const r = await fetch(`/api/${id}/logs`);
-      const j = await r.json();
-      modalLog.textContent = (j.logs || []).join('') || 'No logs yet.';
-      modalLog.scrollTop = modalLog.scrollHeight;
-    } catch (e) {
-      modalLog.textContent = 'Could not fetch logs.';
-    }
-
-    // subscribe via socket
-    socket.emit('subscribe', id);
-  }
-
-  function closeModal(){
-    modal.classList.remove('show');
-    modal.setAttribute('aria-hidden','true');
-    attachedId = null;
-    modalLog.textContent = '';
-  }
-
-  modalClose.onclick = ()=> closeModal();
-  modalCopy.onclick = async ()=> {
-    try {
-      await navigator.clipboard.writeText(modalLog.textContent);
-      // small UI feedback
-      modalCopy.textContent = 'Copied';
-      setTimeout(()=> modalCopy.textContent = 'Copy', 900);
-    } catch(e){
-      modalCopy.textContent = 'Fail';
-      setTimeout(()=> modalCopy.textContent = 'Copy', 900);
-    }
-  };
-  modalClear.onclick = ()=> { modalLog.textContent = ''; };
-
-  // Socket events
-  socket.on('connect', ()=> { /* connected */ });
-  socket.on('bots', list => {
-    // normalize passed list if needed
-    renderCards(list || []);
-    updateInfo(); // refresh host/info when bots list arrives
-  });
-
-  // 'log' events from server: { id, text }
-  socket.on('log', msg => {
-    if(!msg) return;
-    // if it's object {id,text}
-    if(typeof msg === 'object' && msg.id){
-      // Append to modal if matching attachedId
-      if(attachedId && msg.id === attachedId){
-        modalLog.textContent += msg.text;
-        modalLog.scrollTop = modalLog.scrollHeight;
-      }
-      // Also, detect EADDRINUSE style errors and show under the card's error div (not main info)
-      if(/EADDRINUSE|EACCES|ERR/gi.test(String(msg.text))){
-        const errEl = document.getElementById('err-' + msg.id);
-        if(errEl){
-          errEl.style.display = 'block';
-          errEl.textContent += msg.text;
-        }
-      }
-    } else if (typeof msg === 'string'){
-      // legacy string logs -> append to main console area as plain line
-      // We do NOT show raw logs in main info; ignore or optionally append to debug area
-      console.info('raw log:', msg);
-    }
-  });
-
-  // Host/info — dynamic colored JSON in main console
   async function updateInfo(){
-    try {
-      const hostResp = await fetch('/api/host'); const host = await hostResp.json();
-      const botsResp = await fetch('/api/bots'); const botsList = await botsResp.json();
-      const running = (botsList || []).filter(b=>b.status==='running').length;
-
-      const infoObj = {
-        host: {
-          node: host.node,
-          platform: host.platform,
-          arch: host.arch,
-          cwd: host.cwd,
-          cpus: host.cpus,
-          memory_total: host.memory ? host.memory.total : null,
-          memory_free: host.memory ? host.memory.free : null
-        },
-        panel: {
-          version: 'v4.7',
-          bots_total: botsList.length,
-          bots_running: running,
-          uptime: computeUptimeString()
-        },
-        timestamp: new Date().toISOString()
-      };
-
-      // pretty print JSON
-      const pretty = JSON.stringify(infoObj, null, 2);
-
-      // Put inside neon text with syntax coloring via simple spans
-      // We'll color keys and values lightly (not full JSON highlighter)
-      const highlighted = pretty
-        .replace(/(&)/g, '&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;')
-        .replace(/"([^"]+)"\s*:/g,'<span style="color:#7ad1ff">"$1"</span>:') // keys
-        .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffd58a">"$1"</span>') // string values
-        .replace(/:\s*(\d+)/g,': <span style="color:#8cffb3">$1</span>'); // numeric
-
-      infoBox.innerHTML = `<div class="neon-text">${highlighted}</div>`;
-    } catch (e){
-      infoBox.textContent = 'Could not load host info.';
-    }
+    try{
+      const h=await fetch('/api/host').then(r=>r.json());
+      const b=await fetch('/api/bots').then(r=>r.json());
+      const obj={host:h,panel:{version:'v4.7',bots_total:b.length,bots_running:b.filter(x=>x.status==='running').length,uptime:uptime()}};
+      const s=JSON.stringify(obj,null,2).replace(/"([^"]+)":/g,'<span style="color:#7ad1ff">"$1"</span>:').replace(/:\s*"([^"]+)"/g,': <span style="color:#ffd58a">"$1"</span>').replace(/:\s*(\d+)/g,': <span style="color:#8cffb3">$1</span>');
+      infoBox.innerHTML=`<div class="neon-text">${s}</div>`;
+    }catch(e){infoBox.textContent='Host info error.';}
   }
 
-  // compute uptime for panel (approx from page load)
-  const panelStart = Date.now();
-  function computeUptimeString(){
-    const ms = Date.now() - panelStart;
-    const s = Math.floor(ms/1000), h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
-    if(h) return `${h}h ${m}m ${sec}s`;
-    if(m) return `${m}m ${sec}s`;
-    return `${sec}s`;
-  }
-
-  function loadBots(){
-    fetch('/api/bots').then(r=>r.json()).then(list=>{ renderCards(list); updateInfo(); });
-    fetch('/api/host').then(r=>r.json()).then(h=>{ /* host updated in updateInfo next call */ });
-  }
-
-  // initial
-  loadBots();
-  setInterval(updateInfo, 5000);
-  setInterval(loadBots, 10000);
-
+  const start=Date.now();
+  function uptime(){let t=Math.floor((Date.now()-start)/1000),h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;return `${h}h ${m}m ${s}s`;}
+  function loadBots(){fetch('/api/bots').then(r=>r.json()).then(renderCards).then(updateInfo);}
+  loadBots();setInterval(updateInfo,5000);
 })();
 </script>
 </body>
