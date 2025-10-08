@@ -46,9 +46,15 @@ function emitBots() {
     entry: b.entry,
     status: b.status,
     startTime: b.startTime || null,
-    dir: b.dir
+    dir: b.dir,
+    port: b.port || null
   }));
   io.emit("bots", list);
+}
+
+// ✅ Random safe port generator (prevents EADDRINUSE)
+function getRandomPort(base = 10000) {
+  return base + Math.floor(Math.random() * 40000);
 }
 
 // ✅ crash-safe start function
@@ -64,11 +70,14 @@ function startBot(id, restartCount = 0) {
     return;
   }
 
-  appendLog(id, `🚀 Starting bot: node ${bot.entry}\n`);
+  // Assign unique port if not set
+  if (!bot.port) bot.port = getRandomPort();
+
+  appendLog(id, `🚀 Starting bot: node ${bot.entry} (PORT=${bot.port})\n`);
   const proc = spawn("node", [bot.entry], {
     cwd: bot.dir,
     shell: true,
-    env: { ...process.env, NODE_ENV: "production" },
+    env: { ...process.env, NODE_ENV: "production", PORT: bot.port },
   });
 
   bot.proc = proc;
@@ -90,7 +99,12 @@ function startBot(id, restartCount = 0) {
     delete bot.startTime;
     emitBots();
 
-    // limit restart attempts
+    // Retry logic
+    if (code === "EADDRINUSE") {
+      appendLog(id, "⚠️ Port in use. Assigning new port...\n");
+      bot.port = getRandomPort();
+    }
+
     if (code !== 0 && restartCount < 5) {
       appendLog(id, `🔁 Restarting in 5s (try ${restartCount + 1}/5)\n`);
       setTimeout(() => startBot(id, restartCount + 1), 5000);
@@ -122,12 +136,12 @@ app.post("/api/deploy", async (req, res) => {
       proc: null,
       logs: [],
       status: "cloning",
+      port: getRandomPort()
     });
     emitBots();
     appendLog(id, `📦 Cloning ${repoUrl} -> ${appDir}\n`);
 
     const git = simpleGit();
-
     if (fs.existsSync(appDir)) fs.rmSync(appDir, { recursive: true, force: true });
     await git.clone(repoUrl, appDir);
     appendLog(id, `✅ Clone complete\n`);
@@ -157,7 +171,7 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
-// update, start, stop, restart, delete endpoints unchanged
+// start, stop, restart, delete same
 app.post("/api/:id/start", (req, res) => {
   startBot(req.params.id);
   res.json({ message: "starting" });
@@ -210,6 +224,7 @@ app.get("/api/bots", (req, res) => {
     status: b.status,
     startTime: b.startTime || null,
     dir: b.dir,
+    port: b.port
   }));
   res.json(list);
 });
@@ -220,16 +235,21 @@ app.get("/api/:id/logs", (req, res) => {
   res.json({ logs: bot.logs.slice(-2000) });
 });
 
-// ✅ memory in GB
+// ✅ memory in GB (real numbers, not NaN)
 app.get("/api/host", (req, res) => {
-  const totalGB = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2);
-  const freeGB = (os.freemem() / 1024 / 1024 / 1024).toFixed(2);
+  const total = os.totalmem();
+  const free = os.freemem();
   res.json({
     platform: os.platform(),
     arch: os.arch(),
     node: process.version,
     cpus: os.cpus().length,
-    memory: { totalGB, freeGB },
+    memory: {
+      total,
+      free,
+      totalGB: +(total / 1024 / 1024 / 1024).toFixed(2),
+      freeGB: +(free / 1024 / 1024 / 1024).toFixed(2),
+    },
     uptime: os.uptime(),
     bots: bots.size,
   });
@@ -246,7 +266,9 @@ io.on("connection", (socket) => {
   socket.on("detachConsole", (id) => socket.leave(id));
 });
 
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
+app.get("/", (req, res) =>
+  res.sendFile(path.join(__dirname, "public", "index.html"))
+);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`✅ LIKHON PANEL running on port ${PORT}`));
