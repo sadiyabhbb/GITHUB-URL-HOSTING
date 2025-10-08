@@ -25,6 +25,9 @@ if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR, { recursive: true });
 
 const bots = new Map();
 
+// ✅ Permanent uptime start
+const serverStartTime = Date.now();
+
 function cleanAnsi(s) {
   return String(s).replace(/\x1b\[[0-9;]*m/g, "");
 }
@@ -235,10 +238,11 @@ app.get("/api/:id/logs", (req, res) => {
   res.json({ logs: bot.logs.slice(-2000) });
 });
 
-// ✅ memory in GB (real numbers, not NaN)
+// ✅ memory in GB (real numbers, not NaN) + permanent uptime
 app.get("/api/host", (req, res) => {
   const total = os.totalmem();
   const free = os.freemem();
+  const uptimeSeconds = Math.floor((Date.now() - serverStartTime) / 1000);
   res.json({
     platform: os.platform(),
     arch: os.arch(),
@@ -250,7 +254,7 @@ app.get("/api/host", (req, res) => {
       totalGB: +(total / 1024 / 1024 / 1024).toFixed(2),
       freeGB: +(free / 1024 / 1024 / 1024).toFixed(2),
     },
-    uptime: os.uptime(),
+    uptime: uptimeSeconds,
     bots: bots.size,
   });
 });
