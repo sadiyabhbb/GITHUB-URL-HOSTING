@@ -75,8 +75,7 @@
 
       <h3 style="margin-top:2rem;">Host Info</h3>
       <div id="infoBox" class="json-box">Loading host info...</div>
-      <footer>Author: <strong>LIKHON AHMED</strong></footer>
-    </section>
+      </section>
 
     <section id="createSection">
       <h3 style="margin-top:1rem;">Create New Bot</h3>
@@ -238,11 +237,12 @@
       h.memory.totalGB=toGB(h.memory.total);
       h.memory.freeGB=toGB(h.memory.free);
       const obj={host:h,panel:{version:'v4.7',bots_total:b.length,bots_running:b.filter(x=>x.status==='running').length,uptime:uptime()}};
+      // JSON ডেটা থেকে Author-এর অতিরিক্ত লেখা মুছে দেওয়া হলো
       let json=JSON.stringify(obj,null,2)
         .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
         .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
         .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
-      json += `<br><br><span style="color:#58a6ff;">Author: <strong>LIKHON AHMED</strong></span>`;
+      // json += `<br><br><span style="color:#58a6ff;">Author: <strong>LIKHON AHMED</strong></span>`; // <-- এই লাইনটিও মুছে দেওয়া হলো
       infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
     }catch(e){infoBox.textContent='Host info error.';}
   }
