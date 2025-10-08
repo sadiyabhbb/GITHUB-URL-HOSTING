@@ -156,6 +156,12 @@
 
 <script>
 (function(){
+  // --- SESSION CONSTANTS ---
+  const SESSION_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+  const SESSION_KEY = 'panel_key';
+  const EXPIRY_KEY = 'panel_expiry';
+  // -------------------------
+
   const socket = io({reconnection:true,reconnectionDelay:1000});
   const cards=document.getElementById('cards');
   const infoBox=document.getElementById('infoBox');
@@ -199,7 +205,6 @@
     else{serversSection.classList.add('show');}
   }
 
-  // UPDATED API FUNCTION: এখন আর টোকেন Header এ পাঠানোর দরকার নেই
   async function api(path,method='POST',body){
     const response = await fetch(path,{
         method,
@@ -207,8 +212,11 @@
         body:body?JSON.stringify(body):null
     });
 
-    // 401 পেলে আবার কী ইনপুট মডাল দেখাবে (Session timeout/Server change হলে)
+    // যদি সার্ভার 401 দেয় (যেমন index.js এ enforcesKey middleware যোগ করলে)
     if (response.status === 401) {
+        // সেশন শেষ করে আবার কী চাইতে হবে
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(EXPIRY_KEY);
         authError.textContent = "Session expired. Please re-enter Key.";
         authError.style.display = 'block';
         document.body.classList.remove('panel-accessible');
@@ -220,7 +228,6 @@
   }
 
   createBtn.onclick=async()=>{
-    // এরর মেসেজটি প্রথমে লুকিয়ে ফেলুন
     createError.style.display = 'none';
     createError.textContent = '';
 
@@ -272,7 +279,6 @@
           <button class="btn danger btn-delete">Delete</button>
           <button class="btn ghost btn-logs">Logs</button>
         </div>`;
-      // fetch() calls replaced with api() function
       c.querySelector('.btn-start').onclick=()=>api(`/api/${b.id}/start`,'POST').then(()=>loadBots());
       c.querySelector('.btn-stop').onclick=()=>api(`/api/${b.id}/stop`,'POST').then(()=>loadBots());
       c.querySelector('.btn-update').onclick=()=>api(`/api/${b.id}/update`,'POST').then(()=>loadBots());
@@ -288,7 +294,6 @@
     modalMeta.textContent='attached: '+name;
     modalLog.textContent='Loading logs...';
     socket.emit('attachConsole',id);
-    // fetch() call replaced with api() function
     api('/api/'+id+'/logs','GET').then(j=>{ 
       if(!attachedId)return;
       modalLog.textContent=(j.logs||[]).join('');
@@ -325,7 +330,6 @@
 
   async function updateInfo(){
     try{
-      // fetch() calls replaced with api() function
       const h=await api('/api/host','GET');
       const b=await api('/api/bots','GET');
       const toGB=(v)=>((Number(v)||0)/1024/1024/1024).toFixed(2)+' GB';
@@ -338,7 +342,8 @@
         .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
       infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
     }catch(e){
-        if (e.message !== "Unauthorized access.") { // Unauthorized error handle হচ্ছে authModal এ
+        // Unauthorized error handle হচ্ছে authModal এ
+        if (e.message !== "Unauthorized access.") {
              infoBox.textContent='Host info error.';
         }
     }
@@ -350,12 +355,15 @@
     return `${h}h ${m}m ${s}s`;
   }
 
-  function loadBots(){return api('/api/bots','GET').then(renderCards).then(updateInfo).catch(() => {});} // Error handled by api()
+  function loadBots(){return api('/api/bots','GET').then(renderCards).then(updateInfo).catch(() => {});}
 
-  // --- SECURITY KEY VERIFICATION LOGIC START ---
-  const handleKeySubmit = async () => {
+  // --- SECURITY KEY VERIFICATION LOGIC START (Updated for 6-hour session) ---
+  const handleKeySubmit = async (keyFromSession) => {
       authError.style.display = 'none';
-      const key = keyInput.value.trim();
+      
+      // keyFromSession থাকলে সেটি ব্যবহার হবে, না হলে ইনপুট ফিল্ড থেকে নেওয়া হবে
+      const key = keyFromSession || keyInput.value.trim();
+      
       if (!key) {
           authError.textContent = "Please enter the key.";
           authError.style.display = 'block';
@@ -375,11 +383,20 @@
           const data = await response.json();
 
           if (data.success) {
+              // 1. সফল হলে Key এবং 6 ঘন্টার জন্য Expiry Time সেভ করা
+              localStorage.setItem(SESSION_KEY, key);
+              localStorage.setItem(EXPIRY_KEY, Date.now() + SESSION_DURATION_MS);
+              
+              // 2. মডাল লুকান এবং প্যানেল দেখান
               authModal.style.display = 'none';
               document.body.classList.add('panel-accessible'); 
               loadBots(); 
-              setInterval(updateInfo,7000); // প্যানেল এক্সেস হওয়ার পর info আপডেট শুরু
+              setInterval(updateInfo,7000); 
+              
           } else {
+              // ব্যর্থ হলে সেশন মুছে দেওয়া
+              localStorage.removeItem(SESSION_KEY);
+              localStorage.removeItem(EXPIRY_KEY);
               authError.textContent = "Access Denied: Invalid Key.";
               authError.style.display = 'block';
           }
@@ -393,14 +410,32 @@
       }
   };
 
-  keySubmit.onclick = handleKeySubmit;
+  keySubmit.onclick = () => handleKeySubmit();
   keyInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') handleKeySubmit();
   });
 
-  // initial call removed. Panel starts hidden and waits for key.
-  // --- SECURITY KEY VERIFICATION LOGIC END ---
+  // --- Initial Session Check on Load ---
+  const checkSessionAndAuthenticate = () => {
+    const savedKey = localStorage.getItem(SESSION_KEY);
+    const expiryTime = localStorage.getItem(EXPIRY_KEY);
+    const now = Date.now();
+
+    if (savedKey && expiryTime && now < parseInt(expiryTime)) {
+        // সেশন বৈধ, লুকানো Key দিয়ে ভেরিফাই করার চেষ্টা
+        handleKeySubmit(savedKey); 
+    } else {
+        // সেশন অবৈধ বা মেয়াদ উত্তীর্ণ, ম্যানুয়াল লগইন চাইবে
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(EXPIRY_KEY);
+        authModal.style.display = 'flex';
+    }
+  };
   
+  // স্ক্রিপ্ট লোড হওয়ার সাথে সাথে সেশন চেক শুরু হবে
+  checkSessionAndAuthenticate();
+  // --- SECURITY KEY VERIFICATION LOGIC END ---
+
   window.addEventListener('beforeunload',()=>{if(attachedId)socket.emit('detachConsole',attachedId);});
 })();
 </script>
