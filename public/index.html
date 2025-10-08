@@ -17,12 +17,16 @@
     #sidebar.show{left:0}
     #overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;}
     #overlay.show{display:block;}
-    .btn{background:#238636;color:#fff;padding:0.5rem 1rem;border:none;border-radius:6px;cursor:pointer;font-size:14px;transition:0.2s;}
-    .btn:hover{background:#2ea043;}
-    .btn.ghost{background:transparent;border:1px solid #30363d;}
+    .btn{
+      background:#238636;color:#fff;padding:0.5rem 1rem;border:none;border-radius:6px;cursor:pointer;
+      font-size:14px;transition:all 0.2s ease;box-shadow:0 3px #1a472a;
+    }
+    .btn:hover{background:#2ea043;transform:translateY(-2px);box-shadow:0 5px #1f512e;}
+    .btn:active{transform:translateY(2px);box-shadow:inset 0 3px #1a472a;}
+    .btn.ghost{background:transparent;border:1px solid #30363d;box-shadow:none;}
     .btn.ghost:hover{background:#21262d;}
-    .btn.danger{background:#da3633;}
-    .btn.danger:hover{background:#f85149;}
+    .btn.danger{background:#da3633;box-shadow:0 3px #6e1c1a;}
+    .btn.danger:hover{background:#f85149;transform:translateY(-2px);}
     #main{flex:1;margin-left:0;transition:0.3s;width:100%;padding:1rem;}
     header{display:flex;align-items:center;justify-content:space-between;background:#161b22;
       padding:0.8rem 1rem;border-bottom:1px solid #30363d;border-radius:8px;}
@@ -33,7 +37,8 @@
     .card-title{font-weight:600;font-size:1rem;color:#58a6ff;}
     .card-sub{font-size:0.85rem;color:#8b949e;}
     .card-actions{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.8rem;}
-    #createSection,#serversSection{display:none;margin-top:1rem;}
+    #createSection,#serversSection{display:none;margin-top:1rem;opacity:0;transition:opacity 0.6s ease;}
+    #createSection.show,#serversSection.show{display:block;opacity:1;}
     input{width:100%;padding:0.5rem;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#fff;margin-bottom:0.7rem;font-family:"Fira Code";}
     #modal{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;z-index:1000;}
     #modal.show{display:flex;}
@@ -42,7 +47,8 @@
     #modalLog{flex:1;overflow-y:auto;white-space:pre-wrap;font-size:13px;background:#0d1117;
       padding:1rem;border-radius:6px;border:1px solid #30363d;}
     #modalMeta{font-size:12px;color:#8b949e;}
-    .json-box{height:260px;background:#000;border:1px solid #30363d;overflow:auto;padding:0.8rem;border-radius:8px;font-size:14px;white-space:pre-wrap;margin-top:1rem;}
+    .json-box{background:#000;border:1px solid #30363d;overflow:hidden;padding:0.8rem;border-radius:8px;font-size:14px;white-space:pre-wrap;margin-top:1rem;}
+    footer{margin-top:0.6rem;text-align:right;font-size:12px;color:#58a6ff;}
     @keyframes neon{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
   </style>
 </head>
@@ -62,13 +68,14 @@
       <h2>Server Panel</h2>
     </header>
 
-    <section id="serversSection">
+    <section id="serversSection" class="show">
       <h3 style="margin-top:1rem;">Server List</h3>
       <div id="serverSummary" style="color:#8b949e;font-size:14px;margin:0.4rem 0;">Loading...</div>
       <div id="cards"></div>
 
       <h3 style="margin-top:2rem;">Host Info</h3>
       <div id="infoBox" class="json-box">Loading host info...</div>
+      <footer>Author: <strong>LIKHON AHMED</strong></footer>
     </section>
 
     <section id="createSection">
@@ -116,14 +123,21 @@
     const modalCopy=document.getElementById('modalCopy'),modalClear=document.getElementById('modalClear'),modalClose=document.getElementById('modalClose');
 
     let attachedId=null,bots=[];
+    let uptimeStart = localStorage.getItem("uptimeStart");
+    if(!uptimeStart){uptimeStart = Date.now(); localStorage.setItem("uptimeStart", uptimeStart);}
 
     function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
     function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
     menuBtn.onclick=openSidebar;overlay.onclick=()=>{closeSidebar();closeModal();};
-    btnServers.onclick=()=>{showSection('servers');closeSidebar();};
-    btnCreate.onclick=()=>{showSection('create');closeSidebar();};
+    btnServers.onclick=()=>{switchSection('servers');closeSidebar();};
+    btnCreate.onclick=()=>{switchSection('create');closeSidebar();};
     btnRefresh.onclick=()=>{location.reload();};
-    function showSection(n){createSection.style.display=(n==='create'?'block':'none');serversSection.style.display=(n==='create'?'none':'block');}
+
+    function switchSection(section){
+      [createSection,serversSection].forEach(s=>s.classList.remove('show'));
+      if(section==='create'){createSection.classList.add('show');}
+      else{serversSection.classList.add('show');}
+    }
 
     async function api(path,method='POST',body){return fetch(path,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):null}).then(r=>r.json());}
 
@@ -131,10 +145,16 @@
       if(!repo.value.trim())return;
       createBtn.disabled=true;createBtn.textContent='Creating...';
       await api('/api/deploy','POST',{repoUrl:repo.value.trim(),entry:entry.value.trim()||'index.js',name:name.value.trim()});
-      repo.value=entry.value=name.value='';createBtn.disabled=false;createBtn.textContent='Create';
-      showSection('servers');loadBots();
+      repo.value=entry.value=name.value='';
+      setTimeout(()=>{
+        createBtn.disabled=false;createBtn.textContent='Create';
+        switchSection('servers');
+        serversSection.style.opacity=0;
+        setTimeout(()=>{serversSection.style.opacity=1;},400);
+        loadBots();
+      },800);
     };
-    cancelCreate.onclick=()=>showSection('servers');
+    cancelCreate.onclick=()=>switchSection('servers');
 
     function renderCards(list){
       bots=list||[];cards.innerHTML='';
@@ -147,8 +167,8 @@
           <div class="card-actions">
             <button class="btn ghost btn-start">Start</button>
             <button class="btn ghost btn-stop">Stop</button>
-            <button class="btn ghost btn-restart">Restart</button>
             <button class="btn ghost btn-update">Update</button>
+            <button class="btn ghost btn-restart">Restart</button>
             <button class="btn danger btn-delete">Delete</button>
             <button class="btn ghost btn-logs">Logs</button>
           </div>`;
@@ -204,18 +224,13 @@
       }catch(e){infoBox.textContent='Host info error.';}
     }
 
-    const start=Date.now();function uptime(){let t=Math.floor((Date.now()-start)/1000),h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;return `${h}h ${m}m ${s}s`;}
-    function loadBots(){return fetch('/api/bots').then(r=>r.json()).then(renderCards).then(updateInfo);}
-    showSection('servers');
-
-    function checkHashOnLoad(){
-      if(location.hash&&location.hash.startsWith('#bot-')){
-        const id=location.hash.replace('#bot-','');
-        setTimeout(()=>{const found=bots.find(b=>b.id===id);if(found){openModal(found.id,found.name);}},400);
-      }
+    function uptime(){
+      let t=Math.floor((Date.now()-uptimeStart)/1000),
+      h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;
+      return `${h}h ${m}m ${s}s`;
     }
-
-    loadBots().then(checkHashOnLoad);
+    function loadBots(){return fetch('/api/bots').then(r=>r.json()).then(renderCards).then(updateInfo);}
+    loadBots();
     setInterval(updateInfo,7000);
     window.addEventListener('beforeunload',()=>{if(attachedId)socket.emit('detachConsole',attachedId);});
   })();
