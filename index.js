@@ -84,8 +84,7 @@ function enforceToken(req, res, next) {
 }
 // --- END MIDDLEWARE ---
 
-// ... (cleanAnsi, appendLog, emitBots, getRandomPort ফাংশনগুলো অপরিবর্তিত থাকবে) ...
-
+// ... (cleanAnsi, appendLog, emitBots, getRandomPort, startBot, updateBot, ইত্যাদি ফাংশনগুলো এখানে আছে) ...
 function cleanAnsi(s) {
     return String(s).replace(/\x1b\[[0-9;]*m/g, "");
 }
@@ -157,15 +156,17 @@ function startBot(id, restartCount = 0) {
         delete bot.startTime;
         emitBots();
 
+        if (code === 0) return; // Normal exit
+        
         if (code === "EADDRINUSE") {
             appendLog(id, "⚠️ Port in use. Assigning new port...\n");
             bot.port = getRandomPort();
         }
 
-        if (code !== 0 && restartCount < 5) {
+        if (restartCount < 5) {
             appendLog(id, `🔁 Restarting in 5s (try ${restartCount + 1}/5)\n`);
             setTimeout(() => startBot(id, restartCount + 1), 5000);
-        } else if (restartCount >= 5) {
+        } else {
             appendLog(id, "❌ Max restart attempts reached. Bot stopped.\n");
         }
     });
@@ -214,22 +215,28 @@ async function updateBot(id) {
         startBot(id);
     }
 }
+// ... (অন্যান্য ফাংশন শেষ) ...
 
-// --- NEW TOKEN API ENDPOINTS START ---
 
-// ✅ ১. টোকেন জেনারেট করার নতুন API Endpoint
-app.post("/api/generate-token", (req, res) => {
-    const { key } = req.body;
+// --- API ENDPOINTS ---
+
+// ✅ ১. টোকেন জেনারেট করার API Endpoint (POST এর পরিবর্তে GET)
+// ⚠️ WARNING: Key টি URL-এর মাধ্যমে যাচ্ছে, যা নিরাপদ নয়।
+app.get("/api/generate-token", (req, res) => {
+    // Key এখন URL Query Parameter (req.query.key) থেকে নেওয়া হচ্ছে
+    const key = req.query.key; 
+
     if (key && key === PANEL_SECRET_KEY) {
+        // Key সঠিক হলে একটি নতুন টোকেন তৈরি করুন
         const token = generateToken(key);
-        // ফ্রন্টএন্ড-এ টোকেন এবং মেয়াদ উত্তীর্ণের সময় পাঠান
+        // টোকেন এবং মেয়াদ উত্তীর্ণের সময় পাঠান
         res.json({ success: true, token: token, expires_in: TOKEN_EXPIRY_MS });
     } else {
         res.status(401).json({ success: false, error: "Invalid Key." });
     }
 });
 
-// ✅ ২. টোকেন ভেরিফাই করার API
+// ✅ ২. টোকেন ভেরিফাই করার API (এখনও POST ব্যবহার করে)
 app.post("/api/verify", (req, res) => {
     const { token } = req.body;
     if (verifyToken(token)) {
@@ -239,10 +246,8 @@ app.post("/api/verify", (req, res) => {
     }
 });
 
-// --- NEW TOKEN API ENDPOINTS END ---
 
-
-// ⚠️ সমস্ত API Endpoints-এ 'enforceToken' middleware যোগ করা হয়েছে
+// ⚠️ নিম্নলিখিত সমস্ত API Endpoints-এ 'enforceToken' middleware যোগ করা হয়েছে
 app.post("/api/deploy", enforceToken, async (req, res) => {
   try {
     const { repoUrl, name, entry = "index.js" } = req.body;
