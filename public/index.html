@@ -192,7 +192,7 @@
       try{
         const h=await fetch('/api/host').then(r=>r.json());
         const b=await fetch('/api/bots').then(r=>r.json());
-        const toGB=(v)=>(v/1024/1024/1024).toFixed(2)+' GB';
+        const toGB=(v)=>((Number(v)||0)/1024/1024/1024).toFixed(2)+' GB';
         h.memory.totalGB=toGB(h.memory.total);
         h.memory.freeGB=toGB(h.memory.free);
         const obj={host:h,panel:{version:'v4.7',bots_total:b.length,bots_running:b.filter(x=>x.status==='running').length,uptime:uptime()}};
