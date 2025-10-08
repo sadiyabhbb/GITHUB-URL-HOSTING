@@ -76,7 +76,6 @@ function enforceToken(req, res, next) {
 }
 // --- END MIDDLEWARE ---
 
-// ... (cleanAnsi, appendLog, emitBots, getRandomPort, startBot, updateBot, etc. functions here) ...
 function cleanAnsi(s) {
     return String(s).replace(/\x1b\[[0-9;]*m/g, "");
 }
@@ -211,11 +210,10 @@ async function updateBot(id) {
 
 // --- API ENDPOINTS ---
 
-// ✅ ১. টোকেন জেনারেট করার API Endpoint (GET মেথড)
-// ⚠️ WARNING: Key Query Parameter (URL) এর মাধ্যমে যাচ্ছে, যা নিরাপদ নয়।
-app.get("/api/generate-token", (req, res) => {
-    // Key এখন URL Query Parameter (req.query.key) থেকে নেওয়া হচ্ছে
-    const key = req.query.key; 
+// Function to handle token generation logic for both GET and POST
+function handleTokenGeneration(req, res) {
+    // Key GET থেকে (req.query.key) অথবা POST থেকে (req.body.key) নেওয়া হচ্ছে
+    const key = req.query.key || req.body.key; 
 
     if (key && key === PANEL_SECRET_KEY) {
         const token = generateToken(key);
@@ -223,13 +221,21 @@ app.get("/api/generate-token", (req, res) => {
     } else {
         res.status(401).json({ success: false, error: "Invalid Key." });
     }
-});
+}
 
-// ✅ ২. টোকেন ভেরিফাই করার API (এখনও POST ব্যবহার করে, কারণ front-end POST পাঠায়)
+// ✅ ১. টোকেন জেনারেট করার API Endpoint (POST এবং GET দুটোই হ্যান্ডেল করবে)
+// ⚠️ WARNING: GET মেথড ব্যবহার করলে Key URL-এ দৃশ্যমান থাকবে।
+app.post("/api/generate-token", handleTokenGeneration);
+app.get("/api/generate-token", handleTokenGeneration);
+
+
+// ✅ ২. টোকেন ভেরিফাই করার API (POST) 
 app.post("/api/verify", (req, res) => {
     const { token } = req.body;
     if (verifyToken(token)) {
-        res.json({ success: true, message: "Token Valid", expires_in: activeTokens.get(token).expiry - Date.now() });
+        // Expiry time in ms
+        const expiryData = activeTokens.get(token);
+        res.json({ success: true, message: "Token Valid", expires_in: expiryData.expiry - Date.now() });
     } else {
         res.status(401).json({ success: false, error: "Invalid or expired token." });
     }
@@ -293,10 +299,7 @@ app.post("/api/deploy", enforceToken, async (req, res) => {
   }
 });
 
-// --- Protected API Endpoints (POST/GET/DELETE) ---
-
-// *Note: enforceToken middleware handles token check for both POST and GET/DELETE*
-
+// --- Protected API Endpoints ---
 app.post("/api/:id/start", enforceToken, (req, res) => {
   startBot(req.params.id);
   res.json({ message: "starting" });
