@@ -19,7 +19,7 @@
         pointer-events: none;
         transition: opacity 0.3s ease;
     }
-    /* সঠিক কী দেওয়ার পর প্যানেল দেখাবে */
+    /* সঠিক Key/Token দেওয়ার পর প্যানেল দেখাবে */
     .panel-accessible #sidebar, .panel-accessible #main {
         opacity: 1;
         pointer-events: auto;
@@ -162,9 +162,9 @@
 
 <script>
 (function(){
-  // --- SESSION CONSTANTS (Token System এর জন্য আপডেট করা হয়েছে) ---
+  // --- SESSION CONSTANTS (Token System) ---
   const SESSION_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
-  const SESSION_KEY = 'panel_token'; // Key-এর বদলে এখন Token সেভ হবে
+  const SESSION_KEY = 'panel_token'; 
   const EXPIRY_KEY = 'panel_expiry';
   // -------------------------
 
@@ -181,7 +181,7 @@
         modalTitle=document.getElementById('modalTitle'),modalMeta=document.getElementById('modalMeta');
   const modalCopy=document.getElementById('modalCopy'),modalClear=document.getElementById('modalClear'),modalClose=document.getElementById('modalClose');
   
-  // New Security Variables
+  // Security Variables
   const authModal = document.getElementById('authModal');
   const keyInput = document.getElementById('keyInput');
   const authError = document.getElementById('authError');
@@ -205,23 +205,23 @@
     [createSection,serversSection].forEach(s=>s.classList.remove('show'));
     if(section==='create'){
         createSection.classList.add('show');
-        createError.style.display = 'none'; // সেকশন পরিবর্তন হলে এরর মেসেজ লুকিয়ে রাখা
+        createError.style.display = 'none'; 
         createError.textContent = '';
     }
     else{serversSection.classList.add('show');}
   }
 
-  // ✅ API ফাংশন আপডেট: এখন এটি টোকেন Header/Body তে যোগ করে
+  // API ফাংশন: টোকেন যোগ করে
   async function api(path,method='POST',body){
     const token = localStorage.getItem(SESSION_KEY);
     
-    // টোকেন না থাকলে API কল করা উচিত নয়
     if (!token && path !== '/api/generate-token') { 
         throw new Error("Missing Token. Unauthorized access.");
     }
     
     let finalBody = body || {};
-    // GET/DELETE রিকোয়েস্ট এর জন্য body না থাকলে, token query parameter এ পাঠানো ভালো
+    
+    // GET/DELETE রিকোয়েস্ট এর জন্য token Query Parameter এ পাঠানো
     if (['GET', 'DELETE'].includes(method.toUpperCase())) {
         path += (path.includes('?') ? '&' : '?') + 'token=' + token;
     } else {
@@ -235,14 +235,13 @@
     });
 
     if (response.status === 401) {
-        // সেশন শেষ করে আবার কী চাইতে হবে
+        // সেশন শেষ করে আবার লগইন চাইবে
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(EXPIRY_KEY);
         authError.textContent = "Session expired. Please re-enter Key/Token.";
         authError.style.display = 'block';
         document.body.classList.remove('panel-accessible');
         
-        // ✅ ফিক্স: body-তে ক্লাস যোগ করে মডাল দেখাবে
         document.body.classList.add('show-auth');
         
         throw new Error("Unauthorized access.");
@@ -366,7 +365,6 @@
         .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
       infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
     }catch(e){
-        // Unauthorized error handle হচ্ছে authModal এ
         if (e.message !== "Unauthorized access.") {
              infoBox.textContent='Host info error.';
         }
@@ -397,12 +395,12 @@
       keySubmit.textContent = 'Verifying...';
       
       try {
-          let token = keyOrToken; // সেশন থেকে টোকেন আসলে সরাসরি এটিই টোকেন
+          let token = keyOrToken; 
           
-          // সেশন থেকে না আসলে, এটি একটি Key ধরে টোকেন জেনারেট করার চেষ্টা করুন
+          // যদি সেশন থেকে না আসে (অর্থাৎ ইউজার কী বা টোকেন টাইপ করছে)
           if (!keyFromSession) {
               
-              // Key দিয়ে টোকেন জেনারেট করার চেষ্টা
+              // 1. প্রথমে এটি একটি Key ধরে টোকেন জেনারেট করার চেষ্টা করুন
               const generateResponse = await fetch('/api/generate-token', {
                   method: 'POST',
                   headers: { 'content-type': 'application/json' },
@@ -411,16 +409,14 @@
 
               const generateData = await generateResponse.json();
 
-              if (!generateData.success) {
-                  // Key ভুল হলে
-                  authError.textContent = "Access Denied: Invalid Key/Token.";
-                  authError.style.display = 'block';
-                  return;
+              if (generateData.success) {
+                  token = generateData.token; // নতুন জেনারেট হওয়া টোকেন
+              } else {
+                // টোকেন জেনারেট না হলে, ইনপুটটিকে টোকেন ধরে ২য় ধাপে যাচাই করা হবে
               }
-              token = generateData.token; // নতুন জেনারেট হওয়া টোকেন
           }
           
-          // টোকেন দিয়ে Verify করার চেষ্টা
+          // 2. টোকেন দিয়ে Verify করার চেষ্টা
           const verifyResponse = await fetch('/api/verify', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
@@ -430,13 +426,12 @@
           const data = await verifyResponse.json();
 
           if (data.success) {
-              // সফল হলে নতুন টোকেন ও মেয়াদ সেভ করা
+              // সফল হলে টোকেন ও মেয়াদ সেভ করা
               localStorage.setItem(SESSION_KEY, token);
-              // টোকেন জেনারেট API থেকে exp_in পেলে সেটা ব্যবহার করা উচিত, না পেলে ডিফল্ট
               const expiryTime = Date.now() + (data.expires_in || SESSION_DURATION_MS); 
               localStorage.setItem(EXPIRY_KEY, expiryTime);
               
-              // মডাল লুকান এবং প্যানেল দেখান
+              // প্যানেল দেখান
               document.body.classList.remove('show-auth'); 
               document.body.classList.add('panel-accessible'); 
               loadBots(); 
@@ -446,12 +441,13 @@
               // টোকেন অবৈধ হলে
               localStorage.removeItem(SESSION_KEY);
               localStorage.removeItem(EXPIRY_KEY);
-              authError.textContent = "Access Denied: Invalid or expired Token.";
+              authError.textContent = "Access Denied: Invalid Key/Token or Session Expired.";
               authError.style.display = 'block';
               document.body.classList.add('show-auth');
           }
           
       } catch (error) {
+          console.error("Auth process failed:", error);
           authError.textContent = "Server Error. Could not connect or Unauthorized.";
           authError.style.display = 'block';
           document.body.classList.add('show-auth');
@@ -476,16 +472,14 @@
         // সেশন বৈধ, লুকানো Token দিয়ে ভেরিফাই করার চেষ্টা
         handleKeySubmit(savedToken); 
     } else {
-        // সেশন অবৈধ বা মেয়াদ উত্তীর্ণ, ম্যানুয়াল লগইন চাইবে
+        // সেশন অবৈধ বা মেয়াদ উত্তীর্ণ
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(EXPIRY_KEY);
         
-        // body-তে ক্লাস যোগ করে মডাল দেখাবে
         document.body.classList.add('show-auth'); 
     }
   };
   
-  // স্ক্রিপ্ট লোড হওয়ার সাথে সাথে সেশন চেক শুরু হবে
   checkSessionAndAuthenticate();
   // --- SECURITY KEY/TOKEN VERIFICATION LOGIC END ---
 
