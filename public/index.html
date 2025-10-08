@@ -87,7 +87,7 @@
 
       <h3 style="margin-top:2rem;">Host Info</h3>
       <div id="infoBox" class="json-box">Loading host info...</div>
-      </section>
+    </section>
 
     <section id="createSection">
       <h3 style="margin-top:1rem;">Create New Bot</h3>
@@ -222,13 +222,12 @@
           <button class="btn ghost btn-start">Start</button>
           <button class="btn ghost btn-stop">Stop</button>
           <button class="btn ghost btn-update">Update</button>
-          <button class="btn ghost btn-restart">Restart</button>
           <button class="btn danger btn-delete">Delete</button>
           <button class="btn ghost btn-logs">Logs</button>
         </div>`;
       c.querySelector('.btn-start').onclick=()=>fetch(`/api/${b.id}/start`,{method:'POST'}).then(()=>loadBots());
       c.querySelector('.btn-stop').onclick=()=>fetch(`/api/${b.id}/stop`,{method:'POST'}).then(()=>loadBots());
-      c.querySelector('.btn-restart').onclick=()=>fetch(`/api/${b.id}/restart`,{method:'POST'}).then(()=>loadBots());
+      // c.querySelector('.btn-restart').onclick=()=>fetch(`/api/${b.id}/restart`,{method:'POST'}).then(()=>loadBots()); // Restart handler removed
       c.querySelector('.btn-update').onclick=()=>fetch(`/api/${b.id}/update`,{method:'POST'}).then(()=>loadBots());
       c.querySelector('.btn-delete').onclick=()=>fetch(`/api/${b.id}/delete`,{method:'DELETE'}).then(()=>loadBots());
       c.querySelector('.btn-logs').onclick=()=>{openModal(b.id,b.name);location.hash=`bot-${b.id}`;};
