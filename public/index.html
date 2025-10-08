@@ -13,30 +13,24 @@
       display:flex;min-height:100vh;overflow-x:hidden;
     }
     /* --- SECURITY CSS START --- */
-    /* মূল প্যানেলকে ডিফল্টভাবে লুকিয়ে রাখা */
     #sidebar, #main {
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.3s ease;
     }
-    /* সঠিক Key/Token দেওয়ার পর প্যানেল দেখাবে */
     .panel-accessible #sidebar, .panel-accessible #main {
         opacity: 1;
         pointer-events: auto;
     }
-    /* কী ইনপুট মডাল */
     #authModal {
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.95);
-      /* ✅ ফিক্স: ডিফল্টভাবে মডাল লুকিয়ে রাখুন */
       display: none; 
       align-items: center;
       justify-content: center;
       z-index: 2000;
     }
-    
-    /* ✅ ফিক্স: সেশন অবৈধ হলে body তে এই ক্লাস যোগ হবে এবং মডাল দেখাবে */
     .show-auth #authModal {
         display: flex;
     }
@@ -81,7 +75,6 @@
     footer{margin-top:0.6rem;text-align:right;font-size:12px;color:#58a6ff;}
     @keyframes neon{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
     
-    /* এরর মেসেজের জন্য CSS */
     #createError {
         color: #f85149; 
         background: #30363d; 
@@ -91,6 +84,14 @@
         text-align: center;
         display: none; 
         font-size: 0.9rem;
+    }
+    
+    /* নতুন ক্লাস: বটের Uptime দেখানোর জন্য */
+    .bot-uptime {
+        font-size: 0.85rem;
+        color: #58a6ff;
+        font-weight: 600;
+        margin-top: 5px; 
     }
   </style>
 </head>
@@ -163,7 +164,6 @@
 <script>
 (function(){
   // --- SESSION CONSTANTS (Token System) ---
-  const SESSION_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
   const SESSION_KEY = 'panel_token'; 
   const EXPIRY_KEY = 'panel_expiry';
   // -------------------------
@@ -191,8 +191,10 @@
   const createError = document.getElementById('createError'); 
 
   let attachedId=null,bots=[];
-  let uptimeStart = localStorage.getItem("uptimeStart");
-  if(!uptimeStart){uptimeStart = Date.now(); localStorage.setItem("uptimeStart", uptimeStart);}
+  
+  // ✅ Panel Uptime এর জন্য Local Storage ট্র্যাকিং মুছে ফেলা হলো।
+  // let uptimeStart = localStorage.getItem("uptimeStart");
+  // if(!uptimeStart){uptimeStart = Date.now(); localStorage.setItem("uptimeStart", uptimeStart);}
 
   function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
   function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
@@ -211,7 +213,6 @@
     else{serversSection.classList.add('show');}
   }
 
-  // API ফাংশন: টোকেন যোগ করে
   async function api(path,method='POST',body){
     const token = localStorage.getItem(SESSION_KEY);
     
@@ -235,7 +236,6 @@
     });
 
     if (response.status === 401) {
-        // সেশন শেষ করে আবার লগইন চাইবে
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(EXPIRY_KEY);
         authError.textContent = "Session expired. Please re-enter Key/Token.";
@@ -294,7 +294,13 @@
     list.forEach(b=>{
       const c=document.createElement('div');c.className='card';
       c.innerHTML=`
-        <div class="card-head"><div><div class="card-title">${b.name}</div><div class="card-sub">${b.entry}</div></div><div class="meta">${b.status}</div></div>
+        <div class="card-head">
+          <div>
+            <div class="card-title">${b.name}</div>
+            <div class="card-sub">${b.entry}</div>
+            <div class="bot-uptime">${b.botUptime}</div> </div>
+          <div class="meta">${b.status}</div>
+        </div>
         <div class="card-actions">
           <button class="btn ghost btn-start">Start</button>
           <button class="btn ghost btn-stop">Stop</button>
@@ -351,6 +357,14 @@
     if(attachedId){modalLog.textContent=txt||'';modalLog.scrollTop=modalLog.scrollHeight;}
   });
 
+  // ✅ সেকেন্ডকে সুন্দর H/M/S ফরম্যাটে কনভার্ট করার ফাংশন
+  function formatSeconds(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
   async function updateInfo(){
     try{
       const h=await api('/api/host','GET');
@@ -358,7 +372,18 @@
       const toGB=(v)=>((Number(v)||0)/1024/1024/1024).toFixed(2)+' GB';
       h.memory.totalGB=toGB(h.memory.total);
       h.memory.freeGB=toGB(h.memory.free);
-      const obj={host:h,panel:{version:'v4.7',bots_total:b.length,bots_running:b.filter(x=>x.status==='running').length,uptime:uptime()}};
+      
+      const obj={
+        host:h,
+        panel:{
+          version:'v4.7',
+          bots_total:b.length,
+          bots_running:b.filter(x=>x.status==='running').length,
+          // ✅ প্যানেলের Uptime এর জন্য এখন সার্ভারের 'host.uptime' ব্যবহার করা হচ্ছে 
+          uptime: formatSeconds(h.uptime) 
+        }
+      };
+      
       let json=JSON.stringify(obj,null,2)
         .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
         .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
@@ -371,15 +396,8 @@
     }
   }
 
-  function uptime(){
-    let t=Math.floor((Date.now()-uptimeStart)/1000),
-    h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;
-    return `${h}h ${m}m ${s}s`;
-  }
-
   function loadBots(){return api('/api/bots','GET').then(renderCards).then(updateInfo).catch(() => {});}
 
-  // --- SECURITY KEY/TOKEN VERIFICATION LOGIC START ---
   const handleKeySubmit = async (keyFromSession) => {
       authError.style.display = 'none';
       
@@ -397,48 +415,39 @@
       try {
           let token = keyOrToken; 
           
-          // যদি সেশন থেকে না আসে (অর্থাৎ ইউজার কী বা টোকেন টাইপ করছে)
           if (!keyFromSession) {
-              
-              // 1. প্রথমে এটি একটি Key ধরে টোকেন জেনারেট করার চেষ্টা করুন
               const generateResponse = await fetch('/api/generate-token', {
                   method: 'POST',
                   headers: { 'content-type': 'application/json' },
-                  body: JSON.stringify({ key: keyOrToken }) // Key পাঠানো হচ্ছে
+                  body: JSON.stringify({ key: keyOrToken })
               });
 
               const generateData = await generateResponse.json();
 
               if (generateData.success) {
-                  token = generateData.token; // নতুন জেনারেট হওয়া টোকেন
-              } else {
-                // টোকেন জেনারেট না হলে, ইনপুটটিকে টোকেন ধরে ২য় ধাপে যাচাই করা হবে
+                  token = generateData.token;
               }
           }
           
-          // 2. টোকেন দিয়ে Verify করার চেষ্টা
           const verifyResponse = await fetch('/api/verify', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ token: token }) // টোকেন পাঠানো হচ্ছে
+              body: JSON.stringify({ token: token })
           });
 
           const data = await verifyResponse.json();
 
           if (data.success) {
-              // সফল হলে টোকেন ও মেয়াদ সেভ করা
               localStorage.setItem(SESSION_KEY, token);
-              const expiryTime = Date.now() + (data.expires_in || SESSION_DURATION_MS); 
+              const expiryTime = Date.now() + (data.expires_in || 6 * 60 * 60 * 1000); 
               localStorage.setItem(EXPIRY_KEY, expiryTime);
               
-              // প্যানেল দেখান
               document.body.classList.remove('show-auth'); 
               document.body.classList.add('panel-accessible'); 
               loadBots(); 
               setInterval(updateInfo,7000); 
               
           } else {
-              // টোকেন অবৈধ হলে
               localStorage.removeItem(SESSION_KEY);
               localStorage.removeItem(EXPIRY_KEY);
               authError.textContent = "Access Denied: Invalid Key/Token or Session Expired.";
@@ -462,17 +471,14 @@
     if (e.key === 'Enter') handleKeySubmit();
   });
 
-  // --- Initial Session Check on Load ---
   const checkSessionAndAuthenticate = () => {
     const savedToken = localStorage.getItem(SESSION_KEY);
     const expiryTime = localStorage.getItem(EXPIRY_KEY);
     const now = Date.now();
 
     if (savedToken && expiryTime && now < parseInt(expiryTime)) {
-        // সেশন বৈধ, লুকানো Token দিয়ে ভেরিফাই করার চেষ্টা
         handleKeySubmit(savedToken); 
     } else {
-        // সেশন অবৈধ বা মেয়াদ উত্তীর্ণ
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(EXPIRY_KEY);
         
@@ -481,8 +487,6 @@
   };
   
   checkSessionAndAuthenticate();
-  // --- SECURITY KEY/TOKEN VERIFICATION LOGIC END ---
-
   window.addEventListener('beforeunload',()=>{if(attachedId)socket.emit('detachConsole',attachedId);});
 })();
 </script>
