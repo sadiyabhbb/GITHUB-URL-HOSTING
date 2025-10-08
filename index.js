@@ -13,6 +13,11 @@ import os from "os";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// --- SECURITY KEY CONFIGURATION START ---
+// WARNING: Best practice is to set this key as an Environment Variable (e.g., PANEL_KEY)
+const PANEL_SECRET_KEY = process.env.PANEL_KEY || "NARUTO1234";
+// --- SECURITY KEY CONFIGURATION END ---
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -165,6 +170,20 @@ async function updateBot(id) {
         startBot(id);
     }
 }
+
+// --- NEW SECURITY VERIFY API START ---
+app.post("/api/verify", (req, res) => {
+    const { key } = req.body;
+    if (key && key === PANEL_SECRET_KEY) {
+        // SUCCESS: Key Matched
+        res.json({ success: true, message: "Access Granted" });
+    } else {
+        // FAILURE: Key Did Not Match
+        res.status(401).json({ success: false, error: "Access Denied: Invalid Key" });
+    }
+});
+// --- NEW SECURITY VERIFY API END ---
+
 
 // 🧩 Deploy new bot
 app.post("/api/deploy", async (req, res) => {
