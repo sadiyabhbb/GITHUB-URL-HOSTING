@@ -29,10 +29,16 @@
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.95);
-      display: flex;
+      /* ✅ ফিক্স: ডিফল্টভাবে মডাল লুকিয়ে রাখুন */
+      display: none; 
       align-items: center;
       justify-content: center;
       z-index: 2000;
+    }
+    
+    /* ✅ ফিক্স: সেশন অবৈধ হলে body তে এই ক্লাস যোগ হবে এবং মডাল দেখাবে */
+    .show-auth #authModal {
+        display: flex;
     }
     /* --- SECURITY CSS END --- */
     
@@ -94,8 +100,8 @@
 
   <div id="authModal">
     <div class="modal-inner" style="max-width:400px; height: auto; padding: 2rem;">
-      <h3 style="margin-bottom:1.5rem; color:#58a6ff;">Enter Panel Key</h3>
-      <input id="keyInput" type="password" placeholder="Enter your key" style="margin-bottom: 1rem;" />
+      <h3 style="margin-bottom:1.5rem; color:#58a6ff;">Enter Panel Key/Token</h3>
+      <input id="keyInput" type="password" placeholder="Enter Key or Token" style="margin-bottom: 1rem;" />
       <div id="authError" style="color: #da3633; font-size: 14px; margin-bottom: 1rem; display: none;"></div>
       <button class="btn" id="keySubmit">Access Panel</button>
     </div>
@@ -156,9 +162,9 @@
 
 <script>
 (function(){
-  // --- SESSION CONSTANTS ---
-  const SESSION_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
-  const SESSION_KEY = 'panel_key';
+  // --- SESSION CONSTANTS (Token System এর জন্য আপডেট করা হয়েছে) ---
+  const SESSION_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
+  const SESSION_KEY = 'panel_token'; // Key-এর বদলে এখন Token সেভ হবে
   const EXPIRY_KEY = 'panel_expiry';
   // -------------------------
 
@@ -205,22 +211,40 @@
     else{serversSection.classList.add('show');}
   }
 
+  // ✅ API ফাংশন আপডেট: এখন এটি টোকেন Header/Body তে যোগ করে
   async function api(path,method='POST',body){
+    const token = localStorage.getItem(SESSION_KEY);
+    
+    // টোকেন না থাকলে API কল করা উচিত নয়
+    if (!token && path !== '/api/generate-token') { 
+        throw new Error("Missing Token. Unauthorized access.");
+    }
+    
+    let finalBody = body || {};
+    // GET/DELETE রিকোয়েস্ট এর জন্য body না থাকলে, token query parameter এ পাঠানো ভালো
+    if (['GET', 'DELETE'].includes(method.toUpperCase())) {
+        path += (path.includes('?') ? '&' : '?') + 'token=' + token;
+    } else {
+        finalBody.token = token; // POST/PUT/PATCH এর জন্য body তে টোকেন যোগ
+    }
+
     const response = await fetch(path,{
         method,
         headers:{'content-type':'application/json'},
-        body:body?JSON.stringify(body):null
+        body: ['GET', 'DELETE'].includes(method.toUpperCase()) ? null : JSON.stringify(finalBody)
     });
 
-    // যদি সার্ভার 401 দেয় (যেমন index.js এ enforcesKey middleware যোগ করলে)
     if (response.status === 401) {
         // সেশন শেষ করে আবার কী চাইতে হবে
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(EXPIRY_KEY);
-        authError.textContent = "Session expired. Please re-enter Key.";
+        authError.textContent = "Session expired. Please re-enter Key/Token.";
         authError.style.display = 'block';
         document.body.classList.remove('panel-accessible');
-        authModal.style.display = 'flex';
+        
+        // ✅ ফিক্স: body-তে ক্লাস যোগ করে মডাল দেখাবে
+        document.body.classList.add('show-auth');
+        
         throw new Error("Unauthorized access.");
     }
     
@@ -357,15 +381,14 @@
 
   function loadBots(){return api('/api/bots','GET').then(renderCards).then(updateInfo).catch(() => {});}
 
-  // --- SECURITY KEY VERIFICATION LOGIC START (Updated for 6-hour session) ---
+  // --- SECURITY KEY/TOKEN VERIFICATION LOGIC START ---
   const handleKeySubmit = async (keyFromSession) => {
       authError.style.display = 'none';
       
-      // keyFromSession থাকলে সেটি ব্যবহার হবে, না হলে ইনপুট ফিল্ড থেকে নেওয়া হবে
-      const key = keyFromSession || keyInput.value.trim();
+      const keyOrToken = keyFromSession || keyInput.value.trim();
       
-      if (!key) {
-          authError.textContent = "Please enter the key.";
+      if (!keyOrToken) {
+          authError.textContent = "Please enter the Key or Token.";
           authError.style.display = 'block';
           return;
       }
@@ -374,36 +397,64 @@
       keySubmit.textContent = 'Verifying...';
       
       try {
-          const response = await fetch('/api/verify', {
+          let token = keyOrToken; // সেশন থেকে টোকেন আসলে সরাসরি এটিই টোকেন
+          
+          // সেশন থেকে না আসলে, এটি একটি Key ধরে টোকেন জেনারেট করার চেষ্টা করুন
+          if (!keyFromSession) {
+              
+              // Key দিয়ে টোকেন জেনারেট করার চেষ্টা
+              const generateResponse = await fetch('/api/generate-token', {
+                  method: 'POST',
+                  headers: { 'content-type': 'application/json' },
+                  body: JSON.stringify({ key: keyOrToken }) // Key পাঠানো হচ্ছে
+              });
+
+              const generateData = await generateResponse.json();
+
+              if (!generateData.success) {
+                  // Key ভুল হলে
+                  authError.textContent = "Access Denied: Invalid Key/Token.";
+                  authError.style.display = 'block';
+                  return;
+              }
+              token = generateData.token; // নতুন জেনারেট হওয়া টোকেন
+          }
+          
+          // টোকেন দিয়ে Verify করার চেষ্টা
+          const verifyResponse = await fetch('/api/verify', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ key: key })
+              body: JSON.stringify({ token: token }) // টোকেন পাঠানো হচ্ছে
           });
 
-          const data = await response.json();
+          const data = await verifyResponse.json();
 
           if (data.success) {
-              // 1. সফল হলে Key এবং 6 ঘন্টার জন্য Expiry Time সেভ করা
-              localStorage.setItem(SESSION_KEY, key);
-              localStorage.setItem(EXPIRY_KEY, Date.now() + SESSION_DURATION_MS);
+              // সফল হলে নতুন টোকেন ও মেয়াদ সেভ করা
+              localStorage.setItem(SESSION_KEY, token);
+              // টোকেন জেনারেট API থেকে exp_in পেলে সেটা ব্যবহার করা উচিত, না পেলে ডিফল্ট
+              const expiryTime = Date.now() + (data.expires_in || SESSION_DURATION_MS); 
+              localStorage.setItem(EXPIRY_KEY, expiryTime);
               
-              // 2. মডাল লুকান এবং প্যানেল দেখান
-              authModal.style.display = 'none';
+              // মডাল লুকান এবং প্যানেল দেখান
+              document.body.classList.remove('show-auth'); 
               document.body.classList.add('panel-accessible'); 
               loadBots(); 
               setInterval(updateInfo,7000); 
               
           } else {
-              // ব্যর্থ হলে সেশন মুছে দেওয়া
+              // টোকেন অবৈধ হলে
               localStorage.removeItem(SESSION_KEY);
               localStorage.removeItem(EXPIRY_KEY);
-              authError.textContent = "Access Denied: Invalid Key.";
+              authError.textContent = "Access Denied: Invalid or expired Token.";
               authError.style.display = 'block';
+              document.body.classList.add('show-auth');
           }
           
       } catch (error) {
-          authError.textContent = "Server Error. Could not connect to server.";
+          authError.textContent = "Server Error. Could not connect or Unauthorized.";
           authError.style.display = 'block';
+          document.body.classList.add('show-auth');
       } finally {
           keySubmit.disabled = false;
           keySubmit.textContent = 'Access Panel';
@@ -417,24 +468,26 @@
 
   // --- Initial Session Check on Load ---
   const checkSessionAndAuthenticate = () => {
-    const savedKey = localStorage.getItem(SESSION_KEY);
+    const savedToken = localStorage.getItem(SESSION_KEY);
     const expiryTime = localStorage.getItem(EXPIRY_KEY);
     const now = Date.now();
 
-    if (savedKey && expiryTime && now < parseInt(expiryTime)) {
-        // সেশন বৈধ, লুকানো Key দিয়ে ভেরিফাই করার চেষ্টা
-        handleKeySubmit(savedKey); 
+    if (savedToken && expiryTime && now < parseInt(expiryTime)) {
+        // সেশন বৈধ, লুকানো Token দিয়ে ভেরিফাই করার চেষ্টা
+        handleKeySubmit(savedToken); 
     } else {
         // সেশন অবৈধ বা মেয়াদ উত্তীর্ণ, ম্যানুয়াল লগইন চাইবে
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(EXPIRY_KEY);
-        authModal.style.display = 'flex';
+        
+        // body-তে ক্লাস যোগ করে মডাল দেখাবে
+        document.body.classList.add('show-auth'); 
     }
   };
   
   // স্ক্রিপ্ট লোড হওয়ার সাথে সাথে সেশন চেক শুরু হবে
   checkSessionAndAuthenticate();
-  // --- SECURITY KEY VERIFICATION LOGIC END ---
+  // --- SECURITY KEY/TOKEN VERIFICATION LOGIC END ---
 
   window.addEventListener('beforeunload',()=>{if(attachedId)socket.emit('detachConsole',attachedId);});
 })();
