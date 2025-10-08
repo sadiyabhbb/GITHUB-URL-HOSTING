@@ -107,133 +107,157 @@
     </div>
   </div>
 
-  <script>
-  (function(){
-    const socket = io({reconnection:true,reconnectionDelay:1000});
-    const cards=document.getElementById('cards');
-    const infoBox=document.getElementById('infoBox');
-    const serverSummary=document.getElementById('serverSummary');
-    const menuBtn=document.getElementById('menuBtn'),sidebar=document.getElementById('sidebar'),overlay=document.getElementById('overlay');
-    const btnServers=document.getElementById('btnServers'),btnCreate=document.getElementById('btnCreate'),btnRefresh=document.getElementById('btnRefresh');
-    const createSection=document.getElementById('createSection'),serversSection=document.getElementById('serversSection');
-    const repo=document.getElementById('repo'),entry=document.getElementById('entry'),name=document.getElementById('name');
-    const createBtn=document.getElementById('createBtn'),cancelCreate=document.getElementById('cancelCreate');
-    const modal=document.getElementById('modal'),modalLog=document.getElementById('modalLog'),
-          modalTitle=document.getElementById('modalTitle'),modalMeta=document.getElementById('modalMeta');
-    const modalCopy=document.getElementById('modalCopy'),modalClear=document.getElementById('modalClear'),modalClose=document.getElementById('modalClose');
+<script>
+(function(){
+  const socket = io({reconnection:true,reconnectionDelay:1000});
+  const cards=document.getElementById('cards');
+  const infoBox=document.getElementById('infoBox');
+  const serverSummary=document.getElementById('serverSummary');
+  const menuBtn=document.getElementById('menuBtn'),sidebar=document.getElementById('sidebar'),overlay=document.getElementById('overlay');
+  const btnServers=document.getElementById('btnServers'),btnCreate=document.getElementById('btnCreate'),btnRefresh=document.getElementById('btnRefresh');
+  const createSection=document.getElementById('createSection'),serversSection=document.getElementById('serversSection');
+  const repo=document.getElementById('repo'),entry=document.getElementById('entry'),name=document.getElementById('name');
+  const createBtn=document.getElementById('createBtn'),cancelCreate=document.getElementById('cancelCreate');
+  const modal=document.getElementById('modal'),modalLog=document.getElementById('modalLog'),
+        modalTitle=document.getElementById('modalTitle'),modalMeta=document.getElementById('modalMeta');
+  const modalCopy=document.getElementById('modalCopy'),modalClear=document.getElementById('modalClear'),modalClose=document.getElementById('modalClose');
 
-    let attachedId=null,bots=[];
-    let uptimeStart = localStorage.getItem("uptimeStart");
-    if(!uptimeStart){uptimeStart = Date.now(); localStorage.setItem("uptimeStart", uptimeStart);}
+  let attachedId=null,bots=[];
+  let uptimeStart = localStorage.getItem("uptimeStart");
+  if(!uptimeStart){uptimeStart = Date.now(); localStorage.setItem("uptimeStart", uptimeStart);}
 
-    function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
-    function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
-    menuBtn.onclick=openSidebar;overlay.onclick=()=>{closeSidebar();closeModal();};
-    btnServers.onclick=()=>{switchSection('servers');closeSidebar();};
-    btnCreate.onclick=()=>{switchSection('create');closeSidebar();};
-    btnRefresh.onclick=()=>{location.reload();};
+  function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
+  function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
+  menuBtn.onclick=openSidebar;overlay.onclick=()=>{closeSidebar();closeModal();};
+  btnServers.onclick=()=>{switchSection('servers');closeSidebar();};
+  btnCreate.onclick=()=>{switchSection('create');closeSidebar();};
+  btnRefresh.onclick=()=>{location.reload();};
 
-    function switchSection(section){
-      [createSection,serversSection].forEach(s=>s.classList.remove('show'));
-      if(section==='create'){createSection.classList.add('show');}
-      else{serversSection.classList.add('show');}
+  function switchSection(section){
+    [createSection,serversSection].forEach(s=>s.classList.remove('show'));
+    if(section==='create'){createSection.classList.add('show');}
+    else{serversSection.classList.add('show');}
+  }
+
+  async function api(path,method='POST',body){
+    return fetch(path,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):null}).then(r=>r.json());
+  }
+
+  createBtn.onclick=async()=>{
+    if(!repo.value.trim() || !entry.value.trim()){
+      alert("Please fill in all required fields!");
+      return;
     }
-
-    async function api(path,method='POST',body){return fetch(path,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):null}).then(r=>r.json());}
-
-    createBtn.onclick=async()=>{
-      if(!repo.value.trim())return;
-      createBtn.disabled=true;createBtn.textContent='Creating...';
-      await api('/api/deploy','POST',{repoUrl:repo.value.trim(),entry:entry.value.trim()||'index.js',name:name.value.trim()});
-      repo.value=entry.value=name.value='';
-      setTimeout(()=>{
-        createBtn.disabled=false;createBtn.textContent='Create';
-        switchSection('servers');
-        serversSection.style.opacity=0;
-        setTimeout(()=>{serversSection.style.opacity=1;},400);
-        loadBots();
-      },800);
-    };
-    cancelCreate.onclick=()=>switchSection('servers');
-
-    function renderCards(list){
-      bots=list||[];cards.innerHTML='';
-      if(!list.length){serverSummary.textContent='No servers found.';return;}
-      serverSummary.textContent=`${list.length} total bots • ${list.filter(x=>x.status==='running').length} running`;
-      list.forEach(b=>{
-        const c=document.createElement('div');c.className='card';
-        c.innerHTML=`
-          <div class="card-head"><div><div class="card-title">${b.name}</div><div class="card-sub">${b.entry}</div></div><div class="meta">${b.status}</div></div>
-          <div class="card-actions">
-            <button class="btn ghost btn-start">Start</button>
-            <button class="btn ghost btn-stop">Stop</button>
-            <button class="btn ghost btn-update">Update</button>
-            <button class="btn ghost btn-restart">Restart</button>
-            <button class="btn danger btn-delete">Delete</button>
-            <button class="btn ghost btn-logs">Logs</button>
-          </div>`;
-        c.querySelector('.btn-start').onclick=()=>fetch(`/api/${b.id}/start`,{method:'POST'}).then(()=>loadBots());
-        c.querySelector('.btn-stop').onclick=()=>fetch(`/api/${b.id}/stop`,{method:'POST'}).then(()=>loadBots());
-        c.querySelector('.btn-restart').onclick=()=>fetch(`/api/${b.id}/restart`,{method:'POST'}).then(()=>loadBots());
-        c.querySelector('.btn-update').onclick=()=>fetch(`/api/${b.id}/update`,{method:'POST'}).then(()=>loadBots());
-        c.querySelector('.btn-delete').onclick=()=>fetch(`/api/${b.id}/delete`,{method:'DELETE'}).then(()=>loadBots());
-        c.querySelector('.btn-logs').onclick=()=>{openModal(b.id,b.name);location.hash=`bot-${b.id}`;};
-        cards.appendChild(c);
-      });
-    }
-
-    function openModal(id,name){
-      attachedId=id;modal.classList.add('show');
-      modalTitle.textContent='Server Console — '+name;modalMeta.textContent='attached: '+name;
-      modalLog.textContent='Loading logs...';socket.emit('attachConsole',id);
-      fetch('/api/'+id+'/logs').then(r=>r.json()).then(j=>{
-        if(!attachedId)return;
-        modalLog.textContent=(j.logs||[]).join('');
-        modalLog.scrollTop=modalLog.scrollHeight;
-      });
-    }
-
-    function closeModal(){if(attachedId)socket.emit('detachConsole',attachedId);modal.classList.remove('show');attachedId=null;if(location.hash.startsWith('#bot-'))history.replaceState(null,'',location.pathname+location.search);}
-    modalClose.onclick=closeModal;
-    modalCopy.onclick=async()=>{await navigator.clipboard.writeText(modalLog.textContent);modalCopy.textContent='Copied';setTimeout(()=>modalCopy.textContent='Copy',800);};
-    modalClear.onclick=()=>modalLog.textContent='';
-
-    socket.on('bots',renderCards);
-    socket.on('log',({id,text})=>{
-      if(attachedId===id){
-        modalLog.textContent+=text;
-        if(modalLog.textContent.length>100000)modalLog.textContent=modalLog.textContent.slice(-80000);
-        modalLog.scrollTop=modalLog.scrollHeight;
-      }
+    createBtn.disabled=true;createBtn.textContent='Creating...';
+    await api('/api/deploy','POST',{
+      repoUrl:repo.value.trim(),
+      entry:entry.value.trim()||'index.js',
+      name:name.value.trim()
     });
-    socket.on('initLogs',(txt)=>{if(attachedId){modalLog.textContent=txt||'';modalLog.scrollTop=modalLog.scrollHeight;}});
+    repo.value=entry.value=name.value='';
+    setTimeout(()=>{
+      createBtn.disabled=false;createBtn.textContent='Create';
+      switchSection('servers');
+      serversSection.style.opacity=0;
+      setTimeout(()=>{serversSection.style.opacity=1;},400);
+      loadBots();
+    },800);
+  };
 
-    async function updateInfo(){
-      try{
-        const h=await fetch('/api/host').then(r=>r.json());
-        const b=await fetch('/api/bots').then(r=>r.json());
-        const toGB=(v)=>((Number(v)||0)/1024/1024/1024).toFixed(2)+' GB';
-        h.memory.totalGB=toGB(h.memory.total);
-        h.memory.freeGB=toGB(h.memory.free);
-        const obj={host:h,panel:{version:'v4.7',bots_total:b.length,bots_running:b.filter(x=>x.status==='running').length,uptime:uptime()}};
-        const json=JSON.stringify(obj,null,2)
-          .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
-          .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
-          .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
-        infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
-      }catch(e){infoBox.textContent='Host info error.';}
-    }
+  cancelCreate.onclick=()=>switchSection('servers');
 
-    function uptime(){
-      let t=Math.floor((Date.now()-uptimeStart)/1000),
-      h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;
-      return `${h}h ${m}m ${s}s`;
+  function renderCards(list){
+    bots=list||[];cards.innerHTML='';
+    if(!list.length){serverSummary.textContent='No servers found.';return;}
+    serverSummary.textContent=`${list.length} total bots • ${list.filter(x=>x.status==='running').length} running`;
+    list.forEach(b=>{
+      const c=document.createElement('div');c.className='card';
+      c.innerHTML=`
+        <div class="card-head"><div><div class="card-title">${b.name}</div><div class="card-sub">${b.entry}</div></div><div class="meta">${b.status}</div></div>
+        <div class="card-actions">
+          <button class="btn ghost btn-start">Start</button>
+          <button class="btn ghost btn-stop">Stop</button>
+          <button class="btn ghost btn-update">Update</button>
+          <button class="btn ghost btn-restart">Restart</button>
+          <button class="btn danger btn-delete">Delete</button>
+          <button class="btn ghost btn-logs">Logs</button>
+        </div>`;
+      c.querySelector('.btn-start').onclick=()=>fetch(`/api/${b.id}/start`,{method:'POST'}).then(()=>loadBots());
+      c.querySelector('.btn-stop').onclick=()=>fetch(`/api/${b.id}/stop`,{method:'POST'}).then(()=>loadBots());
+      c.querySelector('.btn-restart').onclick=()=>fetch(`/api/${b.id}/restart`,{method:'POST'}).then(()=>loadBots());
+      c.querySelector('.btn-update').onclick=()=>fetch(`/api/${b.id}/update`,{method:'POST'}).then(()=>loadBots());
+      c.querySelector('.btn-delete').onclick=()=>fetch(`/api/${b.id}/delete`,{method:'DELETE'}).then(()=>loadBots());
+      c.querySelector('.btn-logs').onclick=()=>{openModal(b.id,b.name);location.hash=`bot-${b.id}`;};
+      cards.appendChild(c);
+    });
+  }
+
+  function openModal(id,name){
+    attachedId=id;modal.classList.add('show');
+    modalTitle.textContent='Server Console — '+name;
+    modalMeta.textContent='attached: '+name;
+    modalLog.textContent='Loading logs...';
+    socket.emit('attachConsole',id);
+    fetch('/api/'+id+'/logs').then(r=>r.json()).then(j=>{
+      if(!attachedId)return;
+      modalLog.textContent=(j.logs||[]).join('');
+      modalLog.scrollTop=modalLog.scrollHeight;
+    });
+  }
+
+  function closeModal(){
+    if(attachedId)socket.emit('detachConsole',attachedId);
+    modal.classList.remove('show');attachedId=null;
+    if(location.hash.startsWith('#bot-'))history.replaceState(null,'',location.pathname+location.search);
+  }
+
+  modalClose.onclick=closeModal;
+  modalCopy.onclick=async()=>{
+    await navigator.clipboard.writeText(modalLog.textContent);
+    modalCopy.textContent='Copied';setTimeout(()=>modalCopy.textContent='Copy',800);
+  };
+  modalClear.onclick=()=>modalLog.textContent='';
+
+  socket.on('bots',renderCards);
+  socket.on('log',({id,text})=>{
+    if(attachedId===id){
+      modalLog.textContent+=text;
+      if(modalLog.textContent.length>100000)modalLog.textContent=modalLog.textContent.slice(-80000);
+      modalLog.scrollTop=modalLog.scrollHeight;
     }
-    function loadBots(){return fetch('/api/bots').then(r=>r.json()).then(renderCards).then(updateInfo);}
-    loadBots();
-    setInterval(updateInfo,7000);
-    window.addEventListener('beforeunload',()=>{if(attachedId)socket.emit('detachConsole',attachedId);});
-  })();
-  </script>
+  });
+  socket.on('initLogs',(txt)=>{
+    if(attachedId){modalLog.textContent=txt||'';modalLog.scrollTop=modalLog.scrollHeight;}
+  });
+
+  async function updateInfo(){
+    try{
+      const h=await fetch('/api/host').then(r=>r.json());
+      const b=await fetch('/api/bots').then(r=>r.json());
+      const toGB=(v)=>((Number(v)||0)/1024/1024/1024).toFixed(2)+' GB';
+      h.memory.totalGB=toGB(h.memory.total);
+      h.memory.freeGB=toGB(h.memory.free);
+      const obj={host:h,panel:{version:'v4.7',bots_total:b.length,bots_running:b.filter(x=>x.status==='running').length,uptime:uptime()}};
+      let json=JSON.stringify(obj,null,2)
+        .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
+        .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
+        .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
+      json += `<br><br><span style="color:#58a6ff;">Author: <strong>LIKHON AHMED</strong></span>`;
+      infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
+    }catch(e){infoBox.textContent='Host info error.';}
+  }
+
+  function uptime(){
+    let t=Math.floor((Date.now()-uptimeStart)/1000),
+    h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;
+    return `${h}h ${m}m ${s}s`;
+  }
+
+  function loadBots(){return fetch('/api/bots').then(r=>r.json()).then(renderCards).then(updateInfo);}
+  loadBots();
+  setInterval(updateInfo,7000);
+  window.addEventListener('beforeunload',()=>{if(attachedId)socket.emit('detachConsole',attachedId);});
+})();
+</script>
 </body>
 </html>
