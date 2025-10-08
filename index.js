@@ -13,10 +13,15 @@ import os from "os";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- SECURITY KEY CONFIGURATION START ---
-// WARNING: Best practice is to set this key as an Environment Variable (e.g., PANEL_KEY)
+// --- SECURITY KEY & TOKEN CONFIGURATION START ---
+// আপনার গোপন Key: এটি ব্যবহার করে টোকেন তৈরি করা হবে
 const PANEL_SECRET_KEY = process.env.PANEL_KEY || "NARUTO1234";
-// --- SECURITY KEY CONFIGURATION END ---
+// টোকেনের বৈধতা (6 ঘন্টা)
+const TOKEN_EXPIRY_MS = 6 * 60 * 60 * 1000; 
+
+// বর্তমানে জারি করা টোকেনগুলি ট্র্যাক করার জন্য
+const activeTokens = new Map(); 
+// --- SECURITY KEY & TOKEN CONFIGURATION END ---
 
 const app = express();
 const server = http.createServer(app);
@@ -29,105 +34,147 @@ const APPS_DIR = path.join(__dirname, "apps");
 if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR, { recursive: true });
 
 const bots = new Map();
-
-// ✅ Permanent uptime start
 const serverStartTime = Date.now();
 
+// --- TOKEN FUNCTIONS ---
+function generateToken(key) {
+    const token = uuidv4();
+    const expiry = Date.now() + TOKEN_EXPIRY_MS;
+    activeTokens.set(token, { expiry, createdAt: Date.now() });
+    
+    // নির্দিষ্ট বিরতিতে মেয়াদোত্তীর্ণ টোকেন মুছে ফেলা
+    if (activeTokens.size > 100) cleanupExpiredTokens(); 
+    
+    return token;
+}
+
+function verifyToken(token) {
+    if (!token) return false;
+    const data = activeTokens.get(token);
+    if (!data) return false; 
+    if (Date.now() > data.expiry) {
+        activeTokens.delete(token); // মেয়াদোত্তীর্ণ হলে মুছে ফেলুন
+        return false;
+    }
+    return true;
+}
+
+function cleanupExpiredTokens() {
+    const now = Date.now();
+    for (let [token, data] of activeTokens.entries()) {
+        if (now > data.expiry) {
+            activeTokens.delete(token);
+        }
+    }
+}
+// --- END TOKEN FUNCTIONS ---
+
+// --- MIDDLEWARE: প্রতিটি API কলে টোকেন চেক করার জন্য ---
+function enforceToken(req, res, next) {
+    // টোকেন Query Parameter বা Body থেকে নিন
+    const token = req.query.token || req.body.token;
+
+    if (verifyToken(token)) {
+        req.userToken = token; 
+        next();
+    } else {
+        // টোকেন না থাকলে বা অবৈধ হলে 401 Unauthorized Response দিন
+        res.status(401).json({ success: false, error: "Access Denied: Invalid or expired token." });
+    }
+}
+// --- END MIDDLEWARE ---
+
+// ... (cleanAnsi, appendLog, emitBots, getRandomPort ফাংশনগুলো অপরিবর্তিত থাকবে) ...
+
 function cleanAnsi(s) {
-  return String(s).replace(/\x1b\[[0-9;]*m/g, "");
+    return String(s).replace(/\x1b\[[0-9;]*m/g, "");
 }
 
 function appendLog(id, chunk) {
-  const bot = bots.get(id);
-  if (!bot) return;
-  const txt = cleanAnsi(String(chunk));
-  bot.logs.push(txt);
-  if (bot.logs.length > 3000) bot.logs.splice(0, bot.logs.length - 3000);
-  io.to(id).emit("log", { id, text: txt });
+    const bot = bots.get(id);
+    if (!bot) return;
+    const txt = cleanAnsi(String(chunk));
+    bot.logs.push(txt);
+    if (bot.logs.length > 3000) bot.logs.splice(0, bot.logs.length - 3000);
+    io.to(id).emit("log", { id, text: txt });
 }
 
 function emitBots() {
-  const list = Array.from(bots.values()).map(b => ({
-    id: b.id,
-    name: b.name,
-    repoUrl: b.repoUrl,
-    entry: b.entry,
-    status: b.status,
-    startTime: b.startTime || null,
-    dir: b.dir,
-    port: b.port || null
-  }));
-  io.emit("bots", list);
+    const list = Array.from(bots.values()).map(b => ({
+        id: b.id,
+        name: b.name,
+        repoUrl: b.repoUrl,
+        entry: b.entry,
+        status: b.status,
+        startTime: b.startTime || null,
+        dir: b.dir,
+        port: b.port || null
+    }));
+    io.emit("bots", list);
 }
 
-// ✅ Random safe port generator (prevents EADDRINUSE)
 function getRandomPort(base = 10000) {
-  return base + Math.floor(Math.random() * 40000);
+    return base + Math.floor(Math.random() * 40000);
 }
 
-// ✅ crash-safe start function
 function startBot(id, restartCount = 0) {
-  const bot = bots.get(id);
-  if (!bot || bot.proc) return;
+    const bot = bots.get(id);
+    if (!bot || bot.proc) return;
 
-  const entryPath = path.join(bot.dir, bot.entry || "index.js");
-  if (!fs.existsSync(entryPath)) {
-    appendLog(id, `❌ Entry not found: ${bot.entry}\n`);
-    bot.status = "error";
-    emitBots();
-    return;
-  }
-
-  // Assign unique port if not set
-  if (!bot.port) bot.port = getRandomPort();
-
-  appendLog(id, `🚀 Starting bot: node ${bot.entry} (PORT=${bot.port})\n`);
-  const proc = spawn("node", [bot.entry], {
-    cwd: bot.dir,
-    shell: true,
-    env: { ...process.env, NODE_ENV: "production", PORT: bot.port },
-  });
-
-  bot.proc = proc;
-  bot.status = "running";
-  bot.startTime = Date.now();
-  emitBots();
-
-  proc.stdout.on("data", d => appendLog(id, d));
-  proc.stderr.on("data", d => appendLog(id, d));
-
-  proc.on("error", err => {
-    appendLog(id, `⚠️ Process error: ${err.message}\n`);
-  });
-
-  proc.on("close", (code) => {
-    appendLog(id, `🛑 Bot exited (code=${code})\n`);
-    bot.proc = null;
-    bot.status = "stopped";
-    delete bot.startTime;
-    emitBots();
-
-    // Retry logic
-    if (code === "EADDRINUSE") {
-      appendLog(id, "⚠️ Port in use. Assigning new port...\n");
-      bot.port = getRandomPort();
+    const entryPath = path.join(bot.dir, bot.entry || "index.js");
+    if (!fs.existsSync(entryPath)) {
+        appendLog(id, `❌ Entry not found: ${bot.entry}\n`);
+        bot.status = "error";
+        emitBots();
+        return;
     }
 
-    if (code !== 0 && restartCount < 5) {
-      appendLog(id, `🔁 Restarting in 5s (try ${restartCount + 1}/5)\n`);
-      setTimeout(() => startBot(id, restartCount + 1), 5000);
-    } else if (restartCount >= 5) {
-      appendLog(id, "❌ Max restart attempts reached. Bot stopped.\n");
-    }
-  });
+    if (!bot.port) bot.port = getRandomPort();
+
+    appendLog(id, `🚀 Starting bot: node ${bot.entry} (PORT=${bot.port})\n`);
+    const proc = spawn("node", [bot.entry], {
+        cwd: bot.dir,
+        shell: true,
+        env: { ...process.env, NODE_ENV: "production", PORT: bot.port },
+    });
+
+    bot.proc = proc;
+    bot.status = "running";
+    bot.startTime = Date.now();
+    emitBots();
+
+    proc.stdout.on("data", d => appendLog(id, d));
+    proc.stderr.on("data", d => appendLog(id, d));
+
+    proc.on("error", err => {
+        appendLog(id, `⚠️ Process error: ${err.message}\n`);
+    });
+
+    proc.on("close", (code) => {
+        appendLog(id, `🛑 Bot exited (code=${code})\n`);
+        bot.proc = null;
+        bot.status = "stopped";
+        delete bot.startTime;
+        emitBots();
+
+        if (code === "EADDRINUSE") {
+            appendLog(id, "⚠️ Port in use. Assigning new port...\n");
+            bot.port = getRandomPort();
+        }
+
+        if (code !== 0 && restartCount < 5) {
+            appendLog(id, `🔁 Restarting in 5s (try ${restartCount + 1}/5)\n`);
+            setTimeout(() => startBot(id, restartCount + 1), 5000);
+        } else if (restartCount >= 5) {
+            appendLog(id, "❌ Max restart attempts reached. Bot stopped.\n");
+        }
+    });
 }
 
-// ⭐ UPDATE FUNCTION ADDED HERE ⭐
 async function updateBot(id) {
     const bot = bots.get(id);
     if (!bot) return;
     
-    // Stop the bot before updating
     if (bot.proc) {
         bot.proc.kill();
         bot.proc = null;
@@ -140,11 +187,9 @@ async function updateBot(id) {
     try {
         const git = simpleGit(bot.dir);
         
-        // 1. Git Pull
         const pullResult = await git.pull();
         appendLog(id, `✅ Git Pull successful: ${pullResult.summary.changes} files changed\n`);
 
-        // 2. npm install (in case dependencies changed)
         bot.status = "installing";
         emitBots();
         appendLog(id, `📦 Running npm install...\n`);
@@ -164,29 +209,41 @@ async function updateBot(id) {
     } catch (err) {
         appendLog(id, `❌ Update failed: ${err.message}\n`);
     } finally {
-        // Always attempt to restart the bot
         bot.status = "stopped";
         emitBots();
         startBot(id);
     }
 }
 
-// --- NEW SECURITY VERIFY API START ---
-app.post("/api/verify", (req, res) => {
+// --- NEW TOKEN API ENDPOINTS START ---
+
+// ✅ ১. টোকেন জেনারেট করার নতুন API Endpoint
+app.post("/api/generate-token", (req, res) => {
     const { key } = req.body;
     if (key && key === PANEL_SECRET_KEY) {
-        // SUCCESS: Key Matched
-        res.json({ success: true, message: "Access Granted" });
+        const token = generateToken(key);
+        // ফ্রন্টএন্ড-এ টোকেন এবং মেয়াদ উত্তীর্ণের সময় পাঠান
+        res.json({ success: true, token: token, expires_in: TOKEN_EXPIRY_MS });
     } else {
-        // FAILURE: Key Did Not Match
-        res.status(401).json({ success: false, error: "Access Denied: Invalid Key" });
+        res.status(401).json({ success: false, error: "Invalid Key." });
     }
 });
-// --- NEW SECURITY VERIFY API END ---
+
+// ✅ ২. টোকেন ভেরিফাই করার API
+app.post("/api/verify", (req, res) => {
+    const { token } = req.body;
+    if (verifyToken(token)) {
+        res.json({ success: true, message: "Token Valid" });
+    } else {
+        res.status(401).json({ success: false, error: "Invalid or expired token." });
+    }
+});
+
+// --- NEW TOKEN API ENDPOINTS END ---
 
 
-// 🧩 Deploy new bot
-app.post("/api/deploy", async (req, res) => {
+// ⚠️ সমস্ত API Endpoints-এ 'enforceToken' middleware যোগ করা হয়েছে
+app.post("/api/deploy", enforceToken, async (req, res) => {
   try {
     const { repoUrl, name, entry = "index.js" } = req.body;
     if (!repoUrl) return res.status(400).json({ error: "repoUrl required" });
@@ -242,13 +299,13 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
-// --- API Endpoints ---
-app.post("/api/:id/start", (req, res) => {
+// --- Protected API Endpoints ---
+app.post("/api/:id/start", enforceToken, (req, res) => {
   startBot(req.params.id);
   res.json({ message: "starting" });
 });
 
-app.post("/api/:id/stop", (req, res) => {
+app.post("/api/:id/stop", enforceToken, (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   if (bot.proc) bot.proc.kill();
@@ -260,18 +317,16 @@ app.post("/api/:id/stop", (req, res) => {
   res.json({ message: "stopped" });
 });
 
-// ⭐ UPDATE ENDPOINT ADDED HERE ⭐
-app.post("/api/:id/update", (req, res) => {
+app.post("/api/:id/update", enforceToken, (req, res) => {
     const id = req.params.id;
     const bot = bots.get(id);
     if (!bot) return res.status(404).json({ error: "bot not found" });
     
-    // Asynchronous operation, send response immediately
     updateBot(id); 
     res.json({ message: "update started" });
 });
 
-app.post("/api/:id/restart", (req, res) => {
+app.post("/api/:id/restart", enforceToken, (req, res) => {
   const id = req.params.id;
   const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
@@ -281,7 +336,7 @@ app.post("/api/:id/restart", (req, res) => {
   res.json({ message: "restarting" });
 });
 
-app.delete("/api/:id/delete", (req, res) => {
+app.delete("/api/:id/delete", enforceToken, (req, res) => {
   const id = req.params.id;
   const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
@@ -296,9 +351,8 @@ app.delete("/api/:id/delete", (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-// --- End API Endpoints ---
 
-app.get("/api/bots", (req, res) => {
+app.get("/api/bots", enforceToken, (req, res) => {
   const list = Array.from(bots.values()).map(b => ({
     id: b.id,
     name: b.name,
@@ -312,14 +366,13 @@ app.get("/api/bots", (req, res) => {
   res.json(list);
 });
 
-app.get("/api/:id/logs", (req, res) => {
+app.get("/api/:id/logs", enforceToken, (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   res.json({ logs: bot.logs.slice(-2000) });
 });
 
-// ✅ memory in GB (real numbers, not NaN) + permanent uptime
-app.get("/api/host", (req, res) => {
+app.get("/api/host", enforceToken, (req, res) => {
   const total = os.totalmem();
   const free = os.freemem();
   const uptimeSeconds = Math.floor((Date.now() - serverStartTime) / 1000);
