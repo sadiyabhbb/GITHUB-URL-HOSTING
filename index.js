@@ -14,12 +14,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- SECURITY KEY & TOKEN CONFIGURATION START ---
-// আপনার গোপন Key
 const PANEL_SECRET_KEY = process.env.PANEL_KEY || "NARUTO1234";
-// টোকেনের বৈধতা (6 ঘন্টা)
 const TOKEN_EXPIRY_MS = 6 * 60 * 60 * 1000; 
-
-// বর্তমানে জারি করা টোকেনগুলি ট্র্যাক করার জন্য
 const activeTokens = new Map(); 
 // --- SECURITY KEY & TOKEN CONFIGURATION END ---
 
@@ -41,9 +37,7 @@ function generateToken(key) {
     const token = uuidv4();
     const expiry = Date.now() + TOKEN_EXPIRY_MS;
     activeTokens.set(token, { expiry, createdAt: Date.now() });
-    
     if (activeTokens.size > 100) cleanupExpiredTokens(); 
-    
     return token;
 }
 
@@ -68,10 +62,10 @@ function cleanupExpiredTokens() {
 }
 // --- END TOKEN FUNCTIONS ---
 
-// --- MIDDLEWARE: প্রতিটি API কলে টোকেন চেক করার জন্য ---
+// --- MIDDLEWARE: টোকেন এনফোর্স করতে, GET ও POST উভয় রিকোয়েস্টের জন্য টোকেন Query বা Body থেকে নিবে ---
 function enforceToken(req, res, next) {
-    // টোকেন Query Parameter বা Body থেকে নিন
-    const token = req.query.token || req.body.token;
+    // GET রিকোয়েস্টের জন্য req.query.token থেকে টোকেন নিচ্ছে
+    const token = req.query.token || req.body.token; 
 
     if (verifyToken(token)) {
         req.userToken = token; 
@@ -82,6 +76,7 @@ function enforceToken(req, res, next) {
 }
 // --- END MIDDLEWARE ---
 
+// ... (cleanAnsi, appendLog, emitBots, getRandomPort, startBot, updateBot, etc. functions here) ...
 function cleanAnsi(s) {
     return String(s).replace(/\x1b\[[0-9;]*m/g, "");
 }
@@ -216,10 +211,11 @@ async function updateBot(id) {
 
 // --- API ENDPOINTS ---
 
-// ✅ ১. টোকেন জেনারেট করার API Endpoint (নিরাপদ POST মেথড)
-app.post("/api/generate-token", (req, res) => {
-    // Key এখন req.body থেকে নেওয়া হচ্ছে
-    const { key } = req.body; 
+// ✅ ১. টোকেন জেনারেট করার API Endpoint (GET মেথড)
+// ⚠️ WARNING: Key Query Parameter (URL) এর মাধ্যমে যাচ্ছে, যা নিরাপদ নয়।
+app.get("/api/generate-token", (req, res) => {
+    // Key এখন URL Query Parameter (req.query.key) থেকে নেওয়া হচ্ছে
+    const key = req.query.key; 
 
     if (key && key === PANEL_SECRET_KEY) {
         const token = generateToken(key);
@@ -229,11 +225,11 @@ app.post("/api/generate-token", (req, res) => {
     }
 });
 
-// ✅ ২. টোকেন ভেরিফাই করার API 
+// ✅ ২. টোকেন ভেরিফাই করার API (এখনও POST ব্যবহার করে, কারণ front-end POST পাঠায়)
 app.post("/api/verify", (req, res) => {
     const { token } = req.body;
     if (verifyToken(token)) {
-        res.json({ success: true, message: "Token Valid" });
+        res.json({ success: true, message: "Token Valid", expires_in: activeTokens.get(token).expiry - Date.now() });
     } else {
         res.status(401).json({ success: false, error: "Invalid or expired token." });
     }
@@ -297,7 +293,10 @@ app.post("/api/deploy", enforceToken, async (req, res) => {
   }
 });
 
-// --- Protected API Endpoints ---
+// --- Protected API Endpoints (POST/GET/DELETE) ---
+
+// *Note: enforceToken middleware handles token check for both POST and GET/DELETE*
+
 app.post("/api/:id/start", enforceToken, (req, res) => {
   startBot(req.params.id);
   res.json({ message: "starting" });
