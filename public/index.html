@@ -12,6 +12,30 @@
       background:#0d1117;color:#c9d1d9;font-family:"Fira Code",monospace;
       display:flex;min-height:100vh;overflow-x:hidden;
     }
+    /* --- SECURITY CSS START --- */
+    /* মূল প্যানেলকে ডিফল্টভাবে লুকিয়ে রাখা */
+    #sidebar, #main {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    /* সঠিক কী দেওয়ার পর প্যানেল দেখাবে */
+    .panel-accessible #sidebar, .panel-accessible #main {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    /* কী ইনপুট মডাল */
+    #authModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    /* --- SECURITY CSS END --- */
+    
     #sidebar{width:240px;background:#161b22;border-right:1px solid #30363d;position:fixed;
       left:-260px;top:0;bottom:0;transition:0.3s;padding:1rem;display:flex;flex-direction:column;gap:1rem;z-index:999;}
     #sidebar.show{left:0}
@@ -65,8 +89,17 @@
   </style>
 </head>
 <body>
+  
   <div id="overlay"></div>
 
+  <div id="authModal">
+    <div class="modal-inner" style="max-width:400px; height: auto; padding: 2rem;">
+      <h3 style="margin-bottom:1.5rem; color:#58a6ff;">Enter Panel Key</h3>
+      <input id="keyInput" type="password" placeholder="Enter your key" style="margin-bottom: 1rem;" />
+      <div id="authError" style="color: #da3633; font-size: 14px; margin-bottom: 1rem; display: none;"></div>
+      <button class="btn" id="keySubmit">Access Panel</button>
+    </div>
+  </div>
   <aside id="sidebar">
     <h2 style="color:#58a6ff;">Server Panel</h2>
     <button class="btn" id="btnServers">Servers</button>
@@ -136,6 +169,12 @@
         modalTitle=document.getElementById('modalTitle'),modalMeta=document.getElementById('modalMeta');
   const modalCopy=document.getElementById('modalCopy'),modalClear=document.getElementById('modalClear'),modalClose=document.getElementById('modalClose');
   
+  // New Security Variables
+  const authModal = document.getElementById('authModal');
+  const keyInput = document.getElementById('keyInput');
+  const authError = document.getElementById('authError');
+  const keySubmit = document.getElementById('keySubmit');
+  
   // Error message element
   const createError = document.getElementById('createError'); 
 
@@ -160,8 +199,24 @@
     else{serversSection.classList.add('show');}
   }
 
+  // UPDATED API FUNCTION: এখন আর টোকেন Header এ পাঠানোর দরকার নেই
   async function api(path,method='POST',body){
-    return fetch(path,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):null}).then(r=>r.json());
+    const response = await fetch(path,{
+        method,
+        headers:{'content-type':'application/json'},
+        body:body?JSON.stringify(body):null
+    });
+
+    // 401 পেলে আবার কী ইনপুট মডাল দেখাবে (Session timeout/Server change হলে)
+    if (response.status === 401) {
+        authError.textContent = "Session expired. Please re-enter Key.";
+        authError.style.display = 'block';
+        document.body.classList.remove('panel-accessible');
+        authModal.style.display = 'flex';
+        throw new Error("Unauthorized access.");
+    }
+    
+    return response.json();
   }
 
   createBtn.onclick=async()=>{
@@ -169,40 +224,32 @@
     createError.style.display = 'none';
     createError.textContent = '';
 
-    if(!repo.value.trim() || !entry.value.trim()){
-      createError.textContent = "Please fill in all required fields!";
+    if(!repo.value.trim()){
+      createError.textContent = "Repository URL is required!";
       createError.style.display = 'block'; 
       return;
     }
     
-    // 1. বাটন ডিসেবল ও টেক্সট পরিবর্তন (ব্যবহারকারীকে জানাই কাজ চলছে)
     createBtn.disabled=true;
     createBtn.textContent='Creating...'; 
 
     try {
-        // 2. API কল
         await api('/api/deploy','POST',{
           repoUrl:repo.value.trim(),
           entry:entry.value.trim()||'index.js',
           name:name.value.trim()
         });
 
-        // 3. ফিল্ড খালি করা
         repo.value=entry.value=name.value='';
-        
-        // 4. সফল হলে সাথে সাথেই UI পরিবর্তন
         switchSection('servers');
         serversSection.style.opacity = 1; 
         loadBots();
 
     } catch (error) {
-        // API কল ব্যর্থ হলে ত্রুটি দেখাও
         console.error("Deploy API call failed:", error);
         createError.textContent = "Bot deployment failed. Check server logs.";
         createError.style.display = 'block'; 
-        
     } finally {
-        // 5. API কল সফল বা ব্যর্থ যাই হোক, বাটন স্বাভাবিক হবে
         createBtn.disabled=false;
         createBtn.textContent='Create';
     }
@@ -225,11 +272,11 @@
           <button class="btn danger btn-delete">Delete</button>
           <button class="btn ghost btn-logs">Logs</button>
         </div>`;
-      c.querySelector('.btn-start').onclick=()=>fetch(`/api/${b.id}/start`,{method:'POST'}).then(()=>loadBots());
-      c.querySelector('.btn-stop').onclick=()=>fetch(`/api/${b.id}/stop`,{method:'POST'}).then(()=>loadBots());
-      // c.querySelector('.btn-restart').onclick=()=>fetch(`/api/${b.id}/restart`,{method:'POST'}).then(()=>loadBots()); // Restart handler removed
-      c.querySelector('.btn-update').onclick=()=>fetch(`/api/${b.id}/update`,{method:'POST'}).then(()=>loadBots());
-      c.querySelector('.btn-delete').onclick=()=>fetch(`/api/${b.id}/delete`,{method:'DELETE'}).then(()=>loadBots());
+      // fetch() calls replaced with api() function
+      c.querySelector('.btn-start').onclick=()=>api(`/api/${b.id}/start`,'POST').then(()=>loadBots());
+      c.querySelector('.btn-stop').onclick=()=>api(`/api/${b.id}/stop`,'POST').then(()=>loadBots());
+      c.querySelector('.btn-update').onclick=()=>api(`/api/${b.id}/update`,'POST').then(()=>loadBots());
+      c.querySelector('.btn-delete').onclick=()=>api(`/api/${b.id}/delete`,'DELETE').then(()=>loadBots());
       c.querySelector('.btn-logs').onclick=()=>{openModal(b.id,b.name);location.hash=`bot-${b.id}`;};
       cards.appendChild(c);
     });
@@ -241,10 +288,13 @@
     modalMeta.textContent='attached: '+name;
     modalLog.textContent='Loading logs...';
     socket.emit('attachConsole',id);
-    fetch('/api/'+id+'/logs').then(r=>r.json()).then(j=>{
+    // fetch() call replaced with api() function
+    api('/api/'+id+'/logs','GET').then(j=>{ 
       if(!attachedId)return;
       modalLog.textContent=(j.logs||[]).join('');
       modalLog.scrollTop=modalLog.scrollHeight;
+    }).catch(e => {
+        if(attachedId) modalLog.textContent = 'Failed to load logs.';
     });
   }
 
@@ -275,8 +325,9 @@
 
   async function updateInfo(){
     try{
-      const h=await fetch('/api/host').then(r=>r.json());
-      const b=await fetch('/api/bots').then(r=>r.json());
+      // fetch() calls replaced with api() function
+      const h=await api('/api/host','GET');
+      const b=await api('/api/bots','GET');
       const toGB=(v)=>((Number(v)||0)/1024/1024/1024).toFixed(2)+' GB';
       h.memory.totalGB=toGB(h.memory.total);
       h.memory.freeGB=toGB(h.memory.free);
@@ -286,7 +337,11 @@
         .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
         .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
       infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
-    }catch(e){infoBox.textContent='Host info error.';}
+    }catch(e){
+        if (e.message !== "Unauthorized access.") { // Unauthorized error handle হচ্ছে authModal এ
+             infoBox.textContent='Host info error.';
+        }
+    }
   }
 
   function uptime(){
@@ -295,9 +350,57 @@
     return `${h}h ${m}m ${s}s`;
   }
 
-  function loadBots(){return fetch('/api/bots').then(r=>r.json()).then(renderCards).then(updateInfo);}
-  loadBots();
-  setInterval(updateInfo,7000);
+  function loadBots(){return api('/api/bots','GET').then(renderCards).then(updateInfo).catch(() => {});} // Error handled by api()
+
+  // --- SECURITY KEY VERIFICATION LOGIC START ---
+  const handleKeySubmit = async () => {
+      authError.style.display = 'none';
+      const key = keyInput.value.trim();
+      if (!key) {
+          authError.textContent = "Please enter the key.";
+          authError.style.display = 'block';
+          return;
+      }
+      
+      keySubmit.disabled = true;
+      keySubmit.textContent = 'Verifying...';
+      
+      try {
+          const response = await fetch('/api/verify', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ key: key })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+              authModal.style.display = 'none';
+              document.body.classList.add('panel-accessible'); 
+              loadBots(); 
+              setInterval(updateInfo,7000); // প্যানেল এক্সেস হওয়ার পর info আপডেট শুরু
+          } else {
+              authError.textContent = "Access Denied: Invalid Key.";
+              authError.style.display = 'block';
+          }
+          
+      } catch (error) {
+          authError.textContent = "Server Error. Could not connect to server.";
+          authError.style.display = 'block';
+      } finally {
+          keySubmit.disabled = false;
+          keySubmit.textContent = 'Access Panel';
+      }
+  };
+
+  keySubmit.onclick = handleKeySubmit;
+  keyInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleKeySubmit();
+  });
+
+  // initial call removed. Panel starts hidden and waits for key.
+  // --- SECURITY KEY VERIFICATION LOGIC END ---
+  
   window.addEventListener('beforeunload',()=>{if(attachedId)socket.emit('detachConsole',attachedId);});
 })();
 </script>
