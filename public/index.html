@@ -29,16 +29,10 @@
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.95);
-      /* ✅ ফিক্স: ডিফল্টভাবে মডাল লুকিয়ে রাখুন */
-      display: none; 
+      display: flex;
       align-items: center;
       justify-content: center;
       z-index: 2000;
-    }
-    
-    /* ✅ ফিক্স: সেশন অবৈধ হলে body তে এই ক্লাস যোগ হবে এবং মডাল দেখাবে */
-    .show-auth #authModal {
-        display: flex;
     }
     /* --- SECURITY CSS END --- */
     
@@ -226,10 +220,7 @@
         authError.textContent = "Session expired. Please re-enter Key.";
         authError.style.display = 'block';
         document.body.classList.remove('panel-accessible');
-        
-        // ✅ ফিক্স: body-তে ক্লাস যোগ করে মডাল দেখাবে
-        document.body.classList.add('show-auth');
-        
+        authModal.style.display = 'flex';
         throw new Error("Unauthorized access.");
     }
     
@@ -370,6 +361,7 @@
   const handleKeySubmit = async (keyFromSession) => {
       authError.style.display = 'none';
       
+      // keyFromSession থাকলে সেটি ব্যবহার হবে, না হলে ইনপুট ফিল্ড থেকে নেওয়া হবে
       const key = keyFromSession || keyInput.value.trim();
       
       if (!key) {
@@ -396,7 +388,7 @@
               localStorage.setItem(EXPIRY_KEY, Date.now() + SESSION_DURATION_MS);
               
               // 2. মডাল লুকান এবং প্যানেল দেখান
-              document.body.classList.remove('show-auth'); // ✅ ফিক্স: মডাল লুকান
+              authModal.style.display = 'none';
               document.body.classList.add('panel-accessible'); 
               loadBots(); 
               setInterval(updateInfo,7000); 
@@ -407,13 +399,11 @@
               localStorage.removeItem(EXPIRY_KEY);
               authError.textContent = "Access Denied: Invalid Key.";
               authError.style.display = 'block';
-              document.body.classList.add('show-auth'); // ✅ ফিক্স: ব্যর্থ হলে মডাল যেন থাকে
           }
           
       } catch (error) {
           authError.textContent = "Server Error. Could not connect to server.";
           authError.style.display = 'block';
-          document.body.classList.add('show-auth'); // ✅ ফিক্স: এরর হলেও মডাল যেন থাকে
       } finally {
           keySubmit.disabled = false;
           keySubmit.textContent = 'Access Panel';
@@ -433,15 +423,12 @@
 
     if (savedKey && expiryTime && now < parseInt(expiryTime)) {
         // সেশন বৈধ, লুকানো Key দিয়ে ভেরিফাই করার চেষ্টা
-        // মডাল লুকানো থাকবে
         handleKeySubmit(savedKey); 
     } else {
         // সেশন অবৈধ বা মেয়াদ উত্তীর্ণ, ম্যানুয়াল লগইন চাইবে
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(EXPIRY_KEY);
-        
-        // ✅ ফিক্স: body-তে ক্লাস যোগ করে মডাল দেখাবে
-        document.body.classList.add('show-auth'); 
+        authModal.style.display = 'flex';
     }
   };
   
