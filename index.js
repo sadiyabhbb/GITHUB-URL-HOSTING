@@ -30,7 +30,8 @@ const APPS_DIR = path.join(__dirname, "apps");
 if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR, { recursive: true });
 
 const bots = new Map();
-const serverStartTime = Date.now();
+// ✅ সার্ভার রিস্টার্টে এটি রিসেট হবে। এটি প্যানেল Uptime এর নতুন সোর্স।
+const serverStartTime = Date.now(); 
 
 // --- TOKEN FUNCTIONS ---
 function generateToken(key) {
@@ -64,7 +65,6 @@ function cleanupExpiredTokens() {
 
 // --- MIDDLEWARE: টোকেন এনফোর্স করতে, GET ও POST উভয় রিকোয়েস্টের জন্য টোকেন Query বা Body থেকে নিবে ---
 function enforceToken(req, res, next) {
-    // GET রিকোয়েস্টের জন্য req.query.token থেকে টোকেন নিচ্ছে
     const token = req.query.token || req.body.token; 
 
     if (verifyToken(token)) {
@@ -89,7 +89,18 @@ function appendLog(id, chunk) {
     io.to(id).emit("log", { id, text: txt });
 }
 
+function formatUptime(ms) {
+    if (!ms || ms < 0) return '0h 0m 0s';
+    const seconds = Math.floor(ms / 1000);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours}h ${minutes}m ${secs}s`;
+}
+
+
 function emitBots() {
+    const now = Date.now();
     const list = Array.from(bots.values()).map(b => ({
         id: b.id,
         name: b.name,
@@ -98,7 +109,9 @@ function emitBots() {
         status: b.status,
         startTime: b.startTime || null,
         dir: b.dir,
-        port: b.port || null
+        port: b.port || null,
+        // ✅ বটের রানিং টাইম হিসেব করে পাঠানো হচ্ছে
+        botUptime: b.startTime && b.status === 'running' ? formatUptime(now - b.startTime) : (b.startTime ? formatUptime(b.lastDuration || 0) : 'N/A')
     }));
     io.emit("bots", list);
 }
@@ -130,7 +143,8 @@ function startBot(id, restartCount = 0) {
 
     bot.proc = proc;
     bot.status = "running";
-    bot.startTime = Date.now();
+    bot.startTime = Date.now(); // স্টার্ট টাইম সেট
+    delete bot.lastDuration; // আগের ডিউরেশন মুছে ফেলা
     emitBots();
 
     proc.stdout.on("data", d => appendLog(id, d));
@@ -142,9 +156,14 @@ function startBot(id, restartCount = 0) {
 
     proc.on("close", (code) => {
         appendLog(id, `🛑 Bot exited (code=${code})\n`);
+        // স্টপ হওয়ার সময় টোটাল রানিং টাইম সেভ করা
+        if (bot.startTime) {
+            bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
+        }
+        
         bot.proc = null;
         bot.status = "stopped";
-        delete bot.startTime;
+        delete bot.startTime; // স্টার্ট টাইম মুছে ফেলা
         emitBots();
 
         if (code === 0) return; 
@@ -168,8 +187,13 @@ async function updateBot(id) {
     if (!bot) return;
     
     if (bot.proc) {
+        // স্টপ হওয়ার সময় টোটাল রানিং টাইম সেভ করা
+        if (bot.startTime) {
+            bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
+        }
         bot.proc.kill();
         bot.proc = null;
+        delete bot.startTime;
     }
     
     bot.status = "updating";
@@ -209,10 +233,7 @@ async function updateBot(id) {
 
 
 // --- API ENDPOINTS ---
-
-// Function to handle token generation logic for both GET and POST
 function handleTokenGeneration(req, res) {
-    // Key GET থেকে (req.query.key) অথবা POST থেকে (req.body.key) নেওয়া হচ্ছে
     const key = req.query.key || req.body.key; 
 
     if (key && key === PANEL_SECRET_KEY) {
@@ -223,17 +244,12 @@ function handleTokenGeneration(req, res) {
     }
 }
 
-// ✅ ১. টোকেন জেনারেট করার API Endpoint (POST এবং GET দুটোই হ্যান্ডেল করবে)
-// ⚠️ WARNING: GET মেথড ব্যবহার করলে Key URL-এ দৃশ্যমান থাকবে।
 app.post("/api/generate-token", handleTokenGeneration);
 app.get("/api/generate-token", handleTokenGeneration);
 
-
-// ✅ ২. টোকেন ভেরিফাই করার API (POST) 
 app.post("/api/verify", (req, res) => {
     const { token } = req.body;
     if (verifyToken(token)) {
-        // Expiry time in ms
         const expiryData = activeTokens.get(token);
         res.json({ success: true, message: "Token Valid", expires_in: expiryData.expiry - Date.now() });
     } else {
@@ -241,8 +257,6 @@ app.post("/api/verify", (req, res) => {
     }
 });
 
-
-// ⚠️ নিম্নলিখিত সমস্ত API Endpoints-এ 'enforceToken' middleware যোগ করা হয়েছে
 app.post("/api/deploy", enforceToken, async (req, res) => {
   try {
     const { repoUrl, name, entry = "index.js" } = req.body;
@@ -308,10 +322,16 @@ app.post("/api/:id/start", enforceToken, (req, res) => {
 app.post("/api/:id/stop", enforceToken, (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
-  if (bot.proc) bot.proc.kill();
+  if (bot.proc) {
+    // স্টপ হওয়ার সময় টোটাল রানিং টাইম সেভ করা
+    if (bot.startTime) {
+        bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
+    }
+    bot.proc.kill();
+  }
   bot.proc = null;
   bot.status = "stopped";
-  delete bot.startTime;
+  delete bot.startTime; // স্টার্ট টাইম মুছে ফেলা
   emitBots();
   appendLog(req.params.id, "🟡 Stopped\n");
   res.json({ message: "stopped" });
@@ -330,7 +350,13 @@ app.post("/api/:id/restart", enforceToken, (req, res) => {
   const id = req.params.id;
   const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
-  if (bot.proc) bot.proc.kill();
+  if (bot.proc) {
+     // স্টপ হওয়ার সময় টোটাল রানিং টাইম সেভ করা
+    if (bot.startTime) {
+        bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
+    }
+    bot.proc.kill();
+  }
   appendLog(id, "🔁 Manual restart\n");
   setTimeout(() => startBot(id), 1500);
   res.json({ message: "restarting" });
@@ -353,6 +379,7 @@ app.delete("/api/:id/delete", enforceToken, (req, res) => {
 });
 
 app.get("/api/bots", enforceToken, (req, res) => {
+  const now = Date.now();
   const list = Array.from(bots.values()).map(b => ({
     id: b.id,
     name: b.name,
@@ -361,7 +388,8 @@ app.get("/api/bots", enforceToken, (req, res) => {
     status: b.status,
     startTime: b.startTime || null,
     dir: b.dir,
-    port: b.port
+    port: b.port,
+    botUptime: b.startTime && b.status === 'running' ? formatUptime(now - b.startTime) : (b.startTime ? formatUptime(b.lastDuration || 0) : 'N/A')
   }));
   res.json(list);
 });
@@ -387,13 +415,27 @@ app.get("/api/host", enforceToken, (req, res) => {
       totalGB: +(total / 1024 / 1024 / 1024).toFixed(2),
       freeGB: +(free / 1024 / 1024 / 1024).toFixed(2),
     },
-    uptime: uptimeSeconds,
+    // ✅ Host-এর আসল Uptime সেকেন্ডে পাঠানো হচ্ছে
+    uptime: uptimeSeconds, 
+    // ✅ প্যানেলের Uptime ট্র্যাকিং সরানো হলো
+    // panel_uptime_start: serverStartTime, 
     bots: bots.size,
   });
 });
 
 io.on("connection", (socket) => {
-  socket.emit("bots", Array.from(bots.values()));
+  // ... (unchanged socket connection logic) ...
+  socket.emit("bots", Array.from(bots.values()).map(b => ({
+    id: b.id,
+    name: b.name,
+    repoUrl: b.repoUrl,
+    entry: b.entry,
+    status: b.status,
+    startTime: b.startTime || null,
+    dir: b.dir,
+    port: b.port || null,
+    botUptime: b.startTime && b.status === 'running' ? formatUptime(Date.now() - b.startTime) : (b.startTime ? formatUptime(b.lastDuration || 0) : 'N/A')
+  })));
   socket.on("attachConsole", (id) => {
     const bot = bots.get(id);
     if (!bot) return;
@@ -409,3 +451,6 @@ app.get("/", (req, res) =>
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`✅ LIKHON PANEL running on port ${PORT}`));
+
+// ✅ প্রতি ৫ সেকেন্ডে বটের স্ট্যাটাস আপডেট করার জন্য timer
+setInterval(emitBots, 5000); 
