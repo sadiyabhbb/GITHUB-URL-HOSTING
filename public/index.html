@@ -50,6 +50,18 @@
     .json-box{background:#000;border:1px solid #30363d;overflow:hidden;padding:0.8rem;border-radius:8px;font-size:14px;white-space:pre-wrap;margin-top:1rem;}
     footer{margin-top:0.6rem;text-align:right;font-size:12px;color:#58a6ff;}
     @keyframes neon{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
+    
+    /* নতুন CSS: এরর মেসেজের জন্য */
+    #createError {
+        color: #f85149; /* Danger color */
+        background: #30363d; /* Dark background */
+        padding: 0.5rem;
+        margin-bottom: 1rem;
+        border-radius: 4px;
+        text-align: center;
+        display: none; /* প্রথমে লুকিয়ে রাখা */
+        font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -79,6 +91,9 @@
 
     <section id="createSection">
       <h3 style="margin-top:1rem;">Create New Bot</h3>
+      
+      <div id="createError"></div> 
+
       <input id="repo" placeholder="Repository URL (e.g. https://github.com/user/repo.git)" />
       <input id="entry" placeholder="Entry File (default: index.js)" />
       <input id="name" placeholder="Bot Name (optional)" />
@@ -120,6 +135,9 @@
   const modal=document.getElementById('modal'),modalLog=document.getElementById('modalLog'),
         modalTitle=document.getElementById('modalTitle'),modalMeta=document.getElementById('modalMeta');
   const modalCopy=document.getElementById('modalCopy'),modalClear=document.getElementById('modalClear'),modalClose=document.getElementById('modalClose');
+  
+  // নতুন Element: error message div
+  const createError = document.getElementById('createError'); 
 
   let attachedId=null,bots=[];
   let uptimeStart = localStorage.getItem("uptimeStart");
@@ -134,7 +152,11 @@
 
   function switchSection(section){
     [createSection,serversSection].forEach(s=>s.classList.remove('show'));
-    if(section==='create'){createSection.classList.add('show');}
+    if(section==='create'){
+        createSection.classList.add('show');
+        createError.style.display = 'none'; // সেকশন পরিবর্তন হলে এরর মেসেজ লুকিয়ে রাখা
+        createError.textContent = '';
+    }
     else{serversSection.classList.add('show');}
   }
 
@@ -143,10 +165,17 @@
   }
 
   createBtn.onclick=async()=>{
+    // এরর মেসেজটি প্রথমে লুকিয়ে ফেলুন
+    createError.style.display = 'none';
+    createError.textContent = '';
+
     if(!repo.value.trim() || !entry.value.trim()){
-      alert("Please fill in all required fields!");
+      // alert("Please fill in all required fields!"); // <-- alert() পরিবর্তন করা হয়েছে
+      createError.textContent = "Please fill in all required fields!";
+      createError.style.display = 'block'; // এরর মেসেজটি দেখান
       return;
     }
+    
     createBtn.disabled=true;createBtn.textContent='Creating...';
     await api('/api/deploy','POST',{
       repoUrl:repo.value.trim(),
@@ -237,12 +266,10 @@
       h.memory.totalGB=toGB(h.memory.total);
       h.memory.freeGB=toGB(h.memory.free);
       const obj={host:h,panel:{version:'v4.7',bots_total:b.length,bots_running:b.filter(x=>x.status==='running').length,uptime:uptime()}};
-      // JSON ডেটা থেকে Author-এর অতিরিক্ত লেখা মুছে দেওয়া হলো
       let json=JSON.stringify(obj,null,2)
         .replace(/"([^"]+)":/g,'<span style="color:#00ffd1">"$1"</span>:')
         .replace(/:\s*"([^"]+)"/g,': <span style="color:#ffda79">"$1"</span>')
         .replace(/:\s*(\d+)/g,': <span style="color:#80ffb3">$1</span>');
-      // json += `<br><br><span style="color:#58a6ff;">Author: <strong>LIKHON AHMED</strong></span>`; // <-- এই লাইনটিও মুছে দেওয়া হলো
       infoBox.innerHTML=`<div style="animation:neon 5s linear infinite;background:linear-gradient(90deg,#00ffd1,#00b3ff,#ff7bd1);-webkit-background-clip:text;color:transparent;">${json}</div>`;
     }catch(e){infoBox.textContent='Host info error.';}
   }
