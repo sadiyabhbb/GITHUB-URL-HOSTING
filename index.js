@@ -117,6 +117,55 @@ function startBot(id, restartCount = 0) {
   });
 }
 
+// ⭐ UPDATE FUNCTION ADDED HERE ⭐
+async function updateBot(id) {
+    const bot = bots.get(id);
+    if (!bot) return;
+    
+    // Stop the bot before updating
+    if (bot.proc) {
+        bot.proc.kill();
+        bot.proc = null;
+    }
+    
+    bot.status = "updating";
+    emitBots();
+    appendLog(id, "🔄 Fetching latest changes (git pull)...\n");
+
+    try {
+        const git = simpleGit(bot.dir);
+        
+        // 1. Git Pull
+        const pullResult = await git.pull();
+        appendLog(id, `✅ Git Pull successful: ${pullResult.summary.changes} files changed\n`);
+
+        // 2. npm install (in case dependencies changed)
+        bot.status = "installing";
+        emitBots();
+        appendLog(id, `📦 Running npm install...\n`);
+
+        await new Promise((resolve, reject) => {
+            const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], {
+                cwd: bot.dir,
+                shell: true,
+            });
+            npm.stdout.on("data", d => appendLog(id, d));
+            npm.stderr.on("data", d => appendLog(id, d));
+            npm.on("close", code => code === 0 ? resolve() : reject(new Error("npm install failed")));
+        });
+        
+        appendLog(id, `✅ Install complete, restarting bot\n`);
+        
+    } catch (err) {
+        appendLog(id, `❌ Update failed: ${err.message}\n`);
+    } finally {
+        // Always attempt to restart the bot
+        bot.status = "stopped";
+        emitBots();
+        startBot(id);
+    }
+}
+
 // 🧩 Deploy new bot
 app.post("/api/deploy", async (req, res) => {
   try {
@@ -174,7 +223,7 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
-// start, stop, restart, delete same
+// --- API Endpoints ---
 app.post("/api/:id/start", (req, res) => {
   startBot(req.params.id);
   res.json({ message: "starting" });
@@ -190,6 +239,17 @@ app.post("/api/:id/stop", (req, res) => {
   emitBots();
   appendLog(req.params.id, "🟡 Stopped\n");
   res.json({ message: "stopped" });
+});
+
+// ⭐ UPDATE ENDPOINT ADDED HERE ⭐
+app.post("/api/:id/update", (req, res) => {
+    const id = req.params.id;
+    const bot = bots.get(id);
+    if (!bot) return res.status(404).json({ error: "bot not found" });
+    
+    // Asynchronous operation, send response immediately
+    updateBot(id); 
+    res.json({ message: "update started" });
 });
 
 app.post("/api/:id/restart", (req, res) => {
@@ -217,6 +277,7 @@ app.delete("/api/:id/delete", (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// --- End API Endpoints ---
 
 app.get("/api/bots", (req, res) => {
   const list = Array.from(bots.values()).map(b => ({
