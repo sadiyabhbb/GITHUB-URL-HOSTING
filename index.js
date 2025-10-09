@@ -19,6 +19,13 @@ const TOKEN_EXPIRY_MS = 6 * 60 * 60 * 1000;
 const activeTokens = new Map(); 
 // --- SECURITY KEY & TOKEN CONFIGURATION END ---
 
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+// ✅ অতিরিক্ত সুবিধা: এখানে আপনার MongoDB Atlas URL সেট করুন। 
+// এটি প্যানেলে কানেক্ট হবে না, কিন্তু প্রতিটি বটের এনভায়রনমেন্টে চলে যাবে।
+const MONGO_ATLAS_URI = process.env.MONGO_URI || "mongodb+srv://maxjihad59_db_user:RCjqzFavFxGCZDE6@cluster0.1rvhfx8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -30,7 +37,7 @@ const APPS_DIR = path.join(__dirname, "apps");
 if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR, { recursive: true });
 
 const bots = new Map();
-// тЬЕ рж╕рж╛рж░рзНржнрж╛рж░ рж░рж┐рж╕рзНржЯрж╛рж░рзНржЯрзЗ ржПржЯрж┐ рж░рж┐рж╕рзЗржЯ рж╣ржмрзЗ (Panel Uptime ржПрж░ рж╕рзЛрж░рзНрж╕)
+// ✅ সার্ভার রিস্টার্টে এটি রিসেট হবে (Panel Uptime এর সোর্স)
 const serverStartTime = Date.now(); 
 
 // --- TOKEN FUNCTIONS ---
@@ -63,7 +70,7 @@ function cleanupExpiredTokens() {
 }
 // --- END TOKEN FUNCTIONS ---
 
-// --- MIDDLEWARE: ржЯрзЛржХрзЗржи ржПржиржлрзЛрж░рзНрж╕ ржХрж░рждрзЗ, GET ржУ POST ржЙржнрзЯ рж░рж┐ржХрзЛрзЯрзЗрж╕рзНржЯрзЗрж░ ржЬржирзНржп ржЯрзЛржХрзЗржи Query ржмрж╛ Body ржерзЗржХрзЗ ржирж┐ржмрзЗ ---
+// --- MIDDLEWARE: টোকেন এনফোর্স করতে, GET ও POST উভয় রিকোয়েস্টের জন্য টোকেন Query বা Body থেকে নিবে ---
 function enforceToken(req, res, next) {
     const token = req.query.token || req.body.token; 
 
@@ -110,7 +117,7 @@ function emitBots() {
         startTime: b.startTime || null,
         dir: b.dir,
         port: b.port || null,
-        // тЬЕ ржмржЯрзЗрж░ рж░рж╛ржирж┐ржВ ржЯрж╛ржЗржо рж╣рж┐рж╕рзЗржм ржХрж░рзЗ ржкрж╛ржарж╛ржирзЛ рж╣ржЪрзНржЫрзЗ (Uptime)
+        // ✅ বটের রানিং টাইম হিসেব করে পাঠানো হচ্ছে (Uptime)
         botUptime: b.startTime && b.status === 'running' ? formatUptime(now - b.startTime) : (b.startTime ? formatUptime(b.lastDuration || 0) : 'N/A')
     }));
     io.emit("bots", list);
@@ -126,7 +133,7 @@ function startBot(id, restartCount = 0) {
 
     const entryPath = path.join(bot.dir, bot.entry || "index.js");
     if (!fs.existsSync(entryPath)) {
-        appendLog(id, `тЭМ Entry not found: ${bot.entry}\n`);
+        appendLog(id, `❌ Entry not found: ${bot.entry}\n`);
         bot.status = "error";
         emitBots();
         return;
@@ -134,50 +141,63 @@ function startBot(id, restartCount = 0) {
 
     if (!bot.port) bot.port = getRandomPort();
 
-    appendLog(id, `ЁЯЪА Starting bot: node ${bot.entry} (PORT=${bot.port})\n`);
-    const proc = spawn("node", [bot.entry], {
+    // 🛑 ফিক্স ১: Node.js মেমরি লিমিট সেট করা (ক্র্যাশ এড়াতে)
+    const memoryLimitMB = 170; 
+    const nodeArgs = [`--max-old-space-size=${memoryLimitMB}`, bot.entry];
+    
+    // 🛑 ফিক্স ২: Environment ভেরিয়েবলে MongoDB URL ঢুকিয়ে দেওয়া 
+    const botEnv = { 
+        ...process.env, 
+        NODE_ENV: "production", 
+        PORT: bot.port,
+        // ✅ এই ভেরিয়েবলটি বটের জন্য সেট করা হলো, প্যানেলের জন্য নয়।
+        MONGO_URI: MONGO_ATLAS_URI 
+    };
+
+    appendLog(id, `🚀 Starting bot: node ${bot.entry} (PORT=${bot.port}) with ${memoryLimitMB}MB RAM limit.\n`);
+    const proc = spawn("node", nodeArgs, { // nodeArgs (মেমরি লিমিট) ব্যবহার করা হলো
         cwd: bot.dir,
         shell: true,
-        env: { ...process.env, NODE_ENV: "production", PORT: bot.port },
+        env: botEnv, // botEnv (MongoDB URL সহ) ব্যবহার করা হলো
     });
 
     bot.proc = proc;
     bot.status = "running";
-    bot.startTime = Date.now(); // рж╕рзНржЯрж╛рж░рзНржЯ ржЯрж╛ржЗржо рж╕рзЗржЯ
-    delete bot.lastDuration; // ржЖржЧрзЗрж░ ржбрж┐ржЙрж░рзЗрж╢ржи ржорзБржЫрзЗ ржлрзЗрж▓рж╛
+    bot.startTime = Date.now(); 
+    delete bot.lastDuration; 
     emitBots();
 
     proc.stdout.on("data", d => appendLog(id, d));
     proc.stderr.on("data", d => appendLog(id, d));
 
     proc.on("error", err => {
-        appendLog(id, `тЪая╕П Process error: ${err.message}\n`);
+        appendLog(id, `⚠️ Process error: ${err.message}\n`);
     });
 
     proc.on("close", (code) => {
-        appendLog(id, `ЁЯЫС Bot exited (code=${code})\n`);
-        // рж╕рзНржЯржк рж╣ржУрзЯрж╛рж░ рж╕ржорзЯ ржЯрзЛржЯрж╛рж▓ рж░рж╛ржирж┐ржВ ржЯрж╛ржЗржо рж╕рзЗржн ржХрж░рж╛
+        appendLog(id, `🛑 Bot exited (code=${code})\n`);
+        
         if (bot.startTime) {
             bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
         }
         
         bot.proc = null;
         bot.status = "stopped";
-        delete bot.startTime; // рж╕рзНржЯрж╛рж░рзНржЯ ржЯрж╛ржЗржо ржорзБржЫрзЗ ржлрзЗрж▓рж╛
+        delete bot.startTime; 
         emitBots();
 
         if (code === 0) return; 
         
         if (code === "EADDRINUSE") {
-            appendLog(id, "тЪая╕П Port in use. Assigning new port...\n");
+            appendLog(id, "⚠️ Port in use. Assigning new port...\n");
             bot.port = getRandomPort();
         }
 
         if (restartCount < 5) {
-            appendLog(id, `ЁЯФБ Restarting in 5s (try ${restartCount + 1}/5)\n`);
+            appendLog(id, `🔁 Restarting in 5s (try ${restartCount + 1}/5)\n`);
             setTimeout(() => startBot(id, restartCount + 1), 5000);
         } else {
-            appendLog(id, "тЭМ Max restart attempts reached. Bot stopped.\n");
+            appendLog(id, "❌ Max restart attempts reached. Bot stopped.\n");
         }
     });
 }
@@ -186,19 +206,18 @@ async function updateBot(id) {
     const bot = bots.get(id);
     if (!bot) return;
     
-    // тЬЕ ржлрж┐ржХрзНрж╕ржб рж▓ржЬрж┐ржХ: ржкрзБрж░рж╛рждржи ржкрзНрж░рж╕рзЗрж╕ ржХрж┐рж▓ ржХрж░рж╛рж░ ржПржмржВ рж╕рзНржЯрзЗржЯрж╕ ржкрж░рж┐рж╖рзНржХрж╛рж░ ржХрж░рж╛рж░ ржЖржкржбрзЗржЯ
+    // ✅ ফিক্সড লজিক: পুরাতন প্রসেস কিল করার এবং স্টেটস পরিষ্কার করার আপডেট
     if (bot.proc) {
-        appendLog(id, "тЪая╕П Stopping previous instance before update...\n");
+        appendLog(id, "⚠️ Stopping previous instance before update...\n");
         
-        // ржкрзНрж░рж╕рзЗрж╕ ржХрж┐рж▓ ржХрж░рж╛рж░ ржЖржЧрзЗ рж░рж╛ржирж┐ржВ ржЯрж╛ржЗржо рж╕рзЗржн ржХрж░рж╛ рж╣ржЪрзНржЫрзЗ
+        // প্রসেস কিল করার আগে রানিং টাইম সেভ করা হচ্ছে
         if (bot.startTime) {
             bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
         }
         
-        // ЁЯЫС ржЧрзБрж░рзБрждрзНржмржкрзВрж░рзНржг: ржкрзНрж░рж╕рзЗрж╕ ржЗржнрзЗржирзНржЯ рж▓рж┐рж╕рзЗржирж╛рж░ рж░рж┐ржорзБржн ржХрж░рж╛
-        // ржПржЯрж┐ ржирж┐рж╢рзНржЪрж┐ржд ржХрж░ржмрзЗ ржпрзЗ 'close' ржЗржнрзЗржирзНржЯржЯрж┐ ржкрж░ржмрж░рзНрждрзАрждрзЗ startBot() ржЯрзНрж░рж┐ржЧрж╛рж░ ржХрж░ржмрзЗ ржирж╛
+        // 🛑 গুরুত্বপূর্ণ: প্রসেস ইভেন্ট লিসেনার রিমুভ করা
         bot.proc.removeAllListeners('close'); 
-        bot.proc.kill('SIGTERM'); // SIGTERM ржжрж┐рзЯрзЗ рж╕ржарж┐ржХржнрж╛ржмрзЗ ржмржирзНржз ржХрж░рж╛рж░ ржЪрзЗрж╖рзНржЯрж╛
+        bot.proc.kill('SIGTERM'); 
         
         bot.proc = null;
         delete bot.startTime; 
@@ -206,17 +225,17 @@ async function updateBot(id) {
     
     bot.status = "updating";
     emitBots();
-    appendLog(id, "ЁЯФД Fetching latest changes (git pull)...\n");
+    appendLog(id, "🔄 Fetching latest changes (git pull)...\n");
 
     try {
         const git = simpleGit(bot.dir);
         
         const pullResult = await git.pull();
-        appendLog(id, `тЬЕ Git Pull successful: ${pullResult.summary.changes} files changed\n`);
+        appendLog(id, `✅ Git Pull successful: ${pullResult.summary.changes} files changed\n`);
 
         bot.status = "installing";
         emitBots();
-        appendLog(id, `ЁЯУж Running npm install...\n`);
+        appendLog(id, `📦 Running npm install...\n`);
 
         await new Promise((resolve, reject) => {
             const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], {
@@ -228,10 +247,10 @@ async function updateBot(id) {
             npm.on("close", code => code === 0 ? resolve() : reject(new Error("npm install failed")));
         });
         
-        appendLog(id, `тЬЕ Install complete, restarting bot\n`);
+        appendLog(id, `✅ Install complete, restarting bot\n`);
         
     } catch (err) {
-        appendLog(id, `тЭМ Update failed: ${err.message}\n`);
+        appendLog(id, `❌ Update failed: ${err.message}\n`);
     } finally {
         bot.status = "stopped";
         emitBots();
@@ -241,15 +260,12 @@ async function updateBot(id) {
 
 
 // --- API ENDPOINTS ---
-
-// тЬЕ ржЯрзЛржХрзЗржи ржЬрзЗржирж╛рж░рзЗржЯ ржХрж░рж╛рж░ API Endpoint (POST ржПржмржВ GET ржжрзБржЯрзЛржЗ рж╣рзНржпрж╛ржирзНржбрзЗрж▓ ржХрж░ржмрзЗ)
 function handleTokenGeneration(req, res) {
     const key = req.query.key || req.body.key; 
 
     if (key && key === PANEL_SECRET_KEY) {
         const token = generateToken(key);
         
-        // тЬЕ ржЪрзВржбрж╝рж╛ржирзНржд JSON ржлрж░ржорзНржпрж╛ржЯ
         res.json({ 
             success: true, 
             token: token, 
@@ -266,8 +282,6 @@ function handleTokenGeneration(req, res) {
 app.post("/api/generate-token", handleTokenGeneration);
 app.get("/api/generate-token", handleTokenGeneration);
 
-
-// тЬЕ ржЯрзЛржХрзЗржи ржнрзЗрж░рж┐ржлрж╛ржЗ ржХрж░рж╛рж░ API (POST) 
 app.post("/api/verify", (req, res) => {
     const { token } = req.body;
     if (verifyToken(token)) {
@@ -278,8 +292,6 @@ app.post("/api/verify", (req, res) => {
     }
 });
 
-
-// тЪая╕П ржирж┐ржорзНржирж▓рж┐ржЦрж┐ржд рж╕ржорж╕рзНржд API Endpoints-ржП 'enforceToken' middleware ржпрзЛржЧ ржХрж░рж╛ рж╣рзЯрзЗржЫрзЗ
 app.post("/api/deploy", enforceToken, async (req, res) => {
   try {
     const { repoUrl, name, entry = "index.js" } = req.body;
@@ -304,16 +316,16 @@ app.post("/api/deploy", enforceToken, async (req, res) => {
       port: getRandomPort()
     });
     emitBots();
-    appendLog(id, `ЁЯУж Cloning ${repoUrl} -> ${appDir}\n`);
+    appendLog(id, `📦 Cloning ${repoUrl} -> ${appDir}\n`);
 
     const git = simpleGit();
     if (fs.existsSync(appDir)) fs.rmSync(appDir, { recursive: true, force: true });
     await git.clone(repoUrl, appDir);
-    appendLog(id, `тЬЕ Clone complete\n`);
+    appendLog(id, `✅ Clone complete\n`);
 
     bots.get(id).status = "installing";
     emitBots();
-    appendLog(id, `ЁЯУж Running npm install...\n`);
+    appendLog(id, `📦 Running npm install...\n`);
 
     await new Promise((resolve, reject) => {
       const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], {
@@ -327,7 +339,7 @@ app.post("/api/deploy", enforceToken, async (req, res) => {
 
     bots.get(id).status = "stopped";
     emitBots();
-    appendLog(id, `тЬЕ Install done, starting in 2s\n`);
+    appendLog(id, `✅ Install done, starting in 2s\n`);
     setTimeout(() => startBot(id), 2000);
 
     res.json({ id, name: safeName, dir: appDir });
@@ -346,7 +358,6 @@ app.post("/api/:id/stop", enforceToken, (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   if (bot.proc) {
-    // рж╕рзНржЯржк рж╣ржУрзЯрж╛рж░ рж╕ржорзЯ ржЯрзЛржЯрж╛рж▓ рж░рж╛ржирж┐ржВ ржЯрж╛ржЗржо рж╕рзЗржн ржХрж░рж╛
     if (bot.startTime) {
         bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
     }
@@ -354,9 +365,9 @@ app.post("/api/:id/stop", enforceToken, (req, res) => {
   }
   bot.proc = null;
   bot.status = "stopped";
-  delete bot.startTime; // рж╕рзНржЯрж╛рж░рзНржЯ ржЯрж╛ржЗржо ржорзБржЫрзЗ ржлрзЗрж▓рж╛
+  delete bot.startTime; 
   emitBots();
-  appendLog(req.params.id, "ЁЯЯб Stopped\n");
+  appendLog(req.params.id, "🟡 Stopped\n");
   res.json({ message: "stopped" });
 });
 
@@ -374,13 +385,12 @@ app.post("/api/:id/restart", enforceToken, (req, res) => {
   const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   if (bot.proc) {
-     // рж╕рзНржЯржк рж╣ржУрзЯрж╛рж░ рж╕ржорзЯ ржЯрзЛржЯрж╛рж▓ рж░рж╛ржирж┐ржВ ржЯрж╛ржЗржо рж╕рзЗржн ржХрж░рж╛
     if (bot.startTime) {
         bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
     }
     bot.proc.kill();
   }
-  appendLog(id, "ЁЯФБ Manual restart\n");
+  appendLog(id, "🔁 Manual restart\n");
   setTimeout(() => startBot(id), 1500);
   res.json({ message: "restarting" });
 });
@@ -391,13 +401,13 @@ app.delete("/api/:id/delete", enforceToken, (req, res) => {
   if (!bot) return res.status(404).json({ error: "bot not found" });
   try {
     if (bot.proc) {
-        bot.proc.removeAllListeners('close'); // ржирж┐рж╢рзНржЪрж┐ржд ржХрж░рж╛ рж╣рж▓рзЛ delete-ржПрж░ рж╕ржорзЯ ржпрзЗржи ржХрзЛржирзЛ ржЕржЯрзЛ-рж░рж┐рж╕рзНржЯрж╛рж░рзНржЯ ржирж╛ рж╣рзЯ
+        bot.proc.removeAllListeners('close'); 
         bot.proc.kill();
     }
     if (fs.existsSync(bot.dir)) fs.rmSync(bot.dir, { recursive: true, force: true });
     bots.delete(id);
     emitBots();
-    appendLog(id, "ЁЯЧСя╕П Bot deleted\n");
+    appendLog(id, "🗑️ Bot deleted\n");
     res.json({ message: "deleted" });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -441,7 +451,6 @@ app.get("/api/host", enforceToken, (req, res) => {
       totalGB: +(total / 1024 / 1024 / 1024).toFixed(2),
       freeGB: +(free / 1024 / 1024 / 1024).toFixed(2),
     },
-    // тЬЕ Host-ржПрж░ ржЖрж╕рж▓ Uptime рж╕рзЗржХрзЗржирзНржбрзЗ ржкрж╛ржарж╛ржирзЛ рж╣ржЪрзНржЫрзЗ
     uptime: uptimeSeconds, 
     bots: bots.size,
   });
@@ -474,7 +483,7 @@ app.get("/", (req, res) =>
 );
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`тЬЕ LIKHON PANEL running on port ${PORT}`));
+server.listen(PORT, () => console.log(`✅ LIKHON PANEL running on port ${PORT}`));
 
-// тЬЕ ржкрзНрж░рждрж┐ рзл рж╕рзЗржХрзЗржирзНржбрзЗ ржмржЯрзЗрж░ рж╕рзНржЯрзНржпрж╛ржЯрж╛рж╕ ржЖржкржбрзЗржЯ ржХрж░рж╛рж░ ржЬржирзНржп timer (Emit Bots)
+// ✅ প্রতি ৫ সেকেন্ডে বটের স্ট্যাটাস আপডেট করার জন্য timer (Emit Bots)
 setInterval(emitBots, 5000);
