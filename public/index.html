@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Likhon Headshot Panel V2</title>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
@@ -86,12 +87,34 @@
         font-size: 0.9rem;
     }
     
-    /* নতুন ক্লাস: বটের Uptime দেখানোর জন্য */
     .bot-uptime {
         font-size: 0.85rem;
         color: #58a6ff;
         font-weight: 600;
         margin-top: 5px; 
+    }
+    
+    /* ✅ নতুন CSS: Input এবং Eye আইকনের জন্য */
+    .input-container {
+        position: relative;
+        margin-bottom: 1rem; /* input এর পুরোনো margin-bottom এর কাজ করছে */
+    }
+    .input-container input {
+        margin-bottom: 0; /* পুরোনো input এর মার্জিন সরিয়ে দেওয়া হলো */
+        padding-right: 2.5rem; /* আইকনের জন্য জায়গা তৈরি করা */
+    }
+    .toggle-password {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #8b949e;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: color 0.2s;
+    }
+    .toggle-password:hover {
+        color: #c9d1d9;
     }
   </style>
 </head>
@@ -102,7 +125,12 @@
   <div id="authModal">
     <div class="modal-inner" style="max-width:400px; height: auto; padding: 2rem;">
       <h3 style="margin-bottom:1.5rem; color:#58a6ff;">Enter Panel Key/Token</h3>
-      <input id="keyInput" type="password" placeholder="Enter Key or Token" style="margin-bottom: 1rem;" />
+      
+      <div class="input-container">
+        <input id="keyInput" type="password" placeholder="Enter Key or Token" />
+        <i class="fas fa-eye toggle-password" id="togglePassword"></i>
+      </div>
+      
       <div id="authError" style="color: #da3633; font-size: 14px; margin-bottom: 1rem; display: none;"></div>
       <button class="btn" id="keySubmit">Access Panel</button>
     </div>
@@ -186,15 +214,12 @@
   const keyInput = document.getElementById('keyInput');
   const authError = document.getElementById('authError');
   const keySubmit = document.getElementById('keySubmit');
+  const togglePassword = document.getElementById('togglePassword'); // ✅ নতুন আইকন এলিমেন্ট
   
   // Error message element
   const createError = document.getElementById('createError'); 
 
   let attachedId=null,bots=[];
-  
-  // ✅ Panel Uptime এর জন্য Local Storage ট্র্যাকিং মুছে ফেলা হলো।
-  // let uptimeStart = localStorage.getItem("uptimeStart");
-  // if(!uptimeStart){uptimeStart = Date.now(); localStorage.setItem("uptimeStart", uptimeStart);}
 
   function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
   function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
@@ -222,11 +247,10 @@
     
     let finalBody = body || {};
     
-    // GET/DELETE রিকোয়েস্ট এর জন্য token Query Parameter এ পাঠানো
     if (['GET', 'DELETE'].includes(method.toUpperCase())) {
         path += (path.includes('?') ? '&' : '?') + 'token=' + token;
     } else {
-        finalBody.token = token; // POST/PUT/PATCH এর জন্য body তে টোকেন যোগ
+        finalBody.token = token; 
     }
 
     const response = await fetch(path,{
@@ -298,7 +322,8 @@
           <div>
             <div class="card-title">${b.name}</div>
             <div class="card-sub">${b.entry}</div>
-            <div class="bot-uptime">${b.botUptime}</div> </div>
+            <div class="bot-uptime">${b.botUptime}</div>
+          </div>
           <div class="meta">${b.status}</div>
         </div>
         <div class="card-actions">
@@ -357,7 +382,6 @@
     if(attachedId){modalLog.textContent=txt||'';modalLog.scrollTop=modalLog.scrollHeight;}
   });
 
-  // ✅ সেকেন্ডকে সুন্দর H/M/S ফরম্যাটে কনভার্ট করার ফাংশন
   function formatSeconds(totalSeconds) {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -379,7 +403,6 @@
           version:'v4.7',
           bots_total:b.length,
           bots_running:b.filter(x=>x.status==='running').length,
-          // ✅ প্যানেলের Uptime এর জন্য এখন সার্ভারের 'host.uptime' ব্যবহার করা হচ্ছে 
           uptime: formatSeconds(h.uptime) 
         }
       };
@@ -466,6 +489,15 @@
       }
   };
 
+  // ✅ পাসওয়ার্ড টগল লজিক
+  togglePassword.onclick = () => {
+      const type = keyInput.type === 'password' ? 'text' : 'password';
+      keyInput.type = type;
+      // আইকন পরিবর্তন
+      togglePassword.classList.toggle('fa-eye');
+      togglePassword.classList.toggle('fa-eye-slash');
+  };
+  
   keySubmit.onclick = () => handleKeySubmit();
   keyInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') handleKeySubmit();
