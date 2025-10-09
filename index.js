@@ -30,7 +30,7 @@ const APPS_DIR = path.join(__dirname, "apps");
 if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR, { recursive: true });
 
 const bots = new Map();
-// ✅ সার্ভার রিস্টার্টে এটি রিসেট হবে। এটি প্যানেল Uptime এর নতুন সোর্স।
+// ✅ সার্ভার রিস্টার্টে এটি রিসেট হবে (Panel Uptime এর নতুন সোর্স)
 const serverStartTime = Date.now(); 
 
 // --- TOKEN FUNCTIONS ---
@@ -110,7 +110,7 @@ function emitBots() {
         startTime: b.startTime || null,
         dir: b.dir,
         port: b.port || null,
-        // ✅ বটের রানিং টাইম হিসেব করে পাঠানো হচ্ছে
+        // ✅ বটের রানিং টাইম হিসেব করে পাঠানো হচ্ছে (Uptime)
         botUptime: b.startTime && b.status === 'running' ? formatUptime(now - b.startTime) : (b.startTime ? formatUptime(b.lastDuration || 0) : 'N/A')
     }));
     io.emit("bots", list);
@@ -233,12 +233,23 @@ async function updateBot(id) {
 
 
 // --- API ENDPOINTS ---
+
+// ✅ টোকেন জেনারেট করার API Endpoint (POST এবং GET দুটোই হ্যান্ডেল করবে)
 function handleTokenGeneration(req, res) {
     const key = req.query.key || req.body.key; 
 
     if (key && key === PANEL_SECRET_KEY) {
         const token = generateToken(key);
-        res.json({ success: true, token: token, expires_in: TOKEN_EXPIRY_MS });
+        
+        // ✅ নতুন JSON ফরম্যাট: expires_in এখন "6h"
+        res.json({ 
+            success: true, 
+            token: token, 
+            expires_in: "6h", 
+            host_name: "TAHSIN VEX", 
+            author: "LIKHON", 
+            generated_at: new Date().toISOString() 
+        });
     } else {
         res.status(401).json({ success: false, error: "Invalid Key." });
     }
@@ -247,6 +258,8 @@ function handleTokenGeneration(req, res) {
 app.post("/api/generate-token", handleTokenGeneration);
 app.get("/api/generate-token", handleTokenGeneration);
 
+
+// ✅ টোকেন ভেরিফাই করার API (POST) 
 app.post("/api/verify", (req, res) => {
     const { token } = req.body;
     if (verifyToken(token)) {
@@ -257,6 +270,8 @@ app.post("/api/verify", (req, res) => {
     }
 });
 
+
+// ⚠️ নিম্নলিখিত সমস্ত API Endpoints-এ 'enforceToken' middleware যোগ করা হয়েছে
 app.post("/api/deploy", enforceToken, async (req, res) => {
   try {
     const { repoUrl, name, entry = "index.js" } = req.body;
@@ -417,14 +432,12 @@ app.get("/api/host", enforceToken, (req, res) => {
     },
     // ✅ Host-এর আসল Uptime সেকেন্ডে পাঠানো হচ্ছে
     uptime: uptimeSeconds, 
-    // ✅ প্যানেলের Uptime ট্র্যাকিং সরানো হলো
-    // panel_uptime_start: serverStartTime, 
     bots: bots.size,
   });
 });
 
 io.on("connection", (socket) => {
-  // ... (unchanged socket connection logic) ...
+  const now = Date.now();
   socket.emit("bots", Array.from(bots.values()).map(b => ({
     id: b.id,
     name: b.name,
@@ -434,7 +447,7 @@ io.on("connection", (socket) => {
     startTime: b.startTime || null,
     dir: b.dir,
     port: b.port || null,
-    botUptime: b.startTime && b.status === 'running' ? formatUptime(Date.now() - b.startTime) : (b.startTime ? formatUptime(b.lastDuration || 0) : 'N/A')
+    botUptime: b.startTime && b.status === 'running' ? formatUptime(now - b.startTime) : (b.startTime ? formatUptime(b.lastDuration || 0) : 'N/A')
   })));
   socket.on("attachConsole", (id) => {
     const bot = bots.get(id);
@@ -452,5 +465,5 @@ app.get("/", (req, res) =>
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`✅ LIKHON PANEL running on port ${PORT}`));
 
-// ✅ প্রতি ৫ সেকেন্ডে বটের স্ট্যাটাস আপডেট করার জন্য timer
-setInterval(emitBots, 5000); 
+// ✅ প্রতি ৫ সেকেন্ডে বটের স্ট্যাটাস আপডেট করার জন্য timer (Emit Bots)
+setInterval(emitBots, 5000);
