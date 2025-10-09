@@ -30,7 +30,7 @@ const APPS_DIR = path.join(__dirname, "apps");
 if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR, { recursive: true });
 
 const bots = new Map();
-// ✅ সার্ভার রিস্টার্টে এটি রিসেট হবে (Panel Uptime এর নতুন সোর্স)
+// ✅ সার্ভার রিস্টার্টে এটি রিসেট হবে (Panel Uptime এর সোর্স)
 const serverStartTime = Date.now(); 
 
 // --- TOKEN FUNCTIONS ---
@@ -186,14 +186,17 @@ async function updateBot(id) {
     const bot = bots.get(id);
     if (!bot) return;
     
+    // ✅ পুরাতন প্রসেস কিল করার এবং স্টেটস পরিষ্কার করার আপডেট করা লজিক
     if (bot.proc) {
-        // স্টপ হওয়ার সময় টোটাল রানিং টাইম সেভ করা
+        // প্রসেস কিল করার আগে রানিং টাইম সেভ করা হচ্ছে 
         if (bot.startTime) {
             bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
         }
+        
+        // প্রসেসটি কিল করা হলো 
         bot.proc.kill();
         bot.proc = null;
-        delete bot.startTime;
+        delete bot.startTime; // স্টার্ট টাইম মুছে ফেলা হলো
     }
     
     bot.status = "updating";
@@ -241,7 +244,7 @@ function handleTokenGeneration(req, res) {
     if (key && key === PANEL_SECRET_KEY) {
         const token = generateToken(key);
         
-        // ✅ নতুন JSON ফরম্যাট: expires_in এখন "6h"
+        // ✅ চূড়ান্ত JSON ফরম্যাট
         res.json({ 
             success: true, 
             token: token, 
