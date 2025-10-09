@@ -10,276 +10,347 @@ import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
 import os from "os";
 
+import axios from "axios";
+import FormData from "form-data";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- SECURITY KEY & TOKEN CONFIGURATION START ---
+// --- CONFIG ---
 const PANEL_SECRET_KEY = process.env.PANEL_KEY || "NARUTO1234";
-const TOKEN_EXPIRY_MS = 6 * 60 * 60 * 1000; 
-const activeTokens = new Map(); 
-// --- SECURITY KEY & TOKEN CONFIGURATION END ---
+const TOKEN_EXPIRY_MS = 6 * 60 * 60 * 1000;
+const BACKUP_URL = process.env.BACKUP_URL || "https://lite-bkup-panel.onrender.com"; // <-- backup/storage server
+const LOG_LOCAL_KEEP = Number(process.env.LOG_LOCAL_KEEP) || 200; // how many log lines to keep locally
+const LOG_UPLOAD_CHUNK = Number(process.env.LOG_UPLOAD_CHUNK) || 150; // when exceed, upload oldest chunk
+// ----------------
+
+const activeTokens = new Map();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "10mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const APPS_DIR = path.join(__dirname, "apps");
 if (!fs.existsSync(APPS_DIR)) fs.mkdirSync(APPS_DIR, { recursive: true });
 
 const bots = new Map();
-// ✅ সার্ভার রিস্টার্টে এটি রিসেট হবে (Panel Uptime এর সোর্স)
-const serverStartTime = Date.now(); 
+const serverStartTime = Date.now();
 
 // --- TOKEN FUNCTIONS ---
 function generateToken(key) {
-    const token = uuidv4();
-    const expiry = Date.now() + TOKEN_EXPIRY_MS;
-    activeTokens.set(token, { expiry, createdAt: Date.now() });
-    if (activeTokens.size > 100) cleanupExpiredTokens(); 
-    return token;
+  const token = uuidv4();
+  const expiry = Date.now() + TOKEN_EXPIRY_MS;
+  activeTokens.set(token, { expiry, createdAt: Date.now() });
+  if (activeTokens.size > 100) cleanupExpiredTokens();
+  return token;
 }
 
 function verifyToken(token) {
-    if (!token) return false;
-    const data = activeTokens.get(token);
-    if (!data) return false; 
-    if (Date.now() > data.expiry) {
-        activeTokens.delete(token); 
-        return false;
-    }
-    return true;
+  if (!token) return false;
+  const data = activeTokens.get(token);
+  if (!data) return false;
+  if (Date.now() > data.expiry) {
+    activeTokens.delete(token);
+    return false;
+  }
+  return true;
 }
 
 function cleanupExpiredTokens() {
-    const now = Date.now();
-    for (let [token, data] of activeTokens.entries()) {
-        if (now > data.expiry) {
-            activeTokens.delete(token);
-        }
-    }
+  const now = Date.now();
+  for (let [token, data] of activeTokens.entries()) {
+    if (now > data.expiry) activeTokens.delete(token);
+  }
 }
 // --- END TOKEN FUNCTIONS ---
 
-// --- MIDDLEWARE: টোকেন এনফোর্স করতে, GET ও POST উভয় রিকোয়েস্টের জন্য টোকেন Query বা Body থেকে নিবে ---
 function enforceToken(req, res, next) {
-    const token = req.query.token || req.body.token; 
-
-    if (verifyToken(token)) {
-        req.userToken = token; 
-        next();
-    } else {
-        res.status(401).json({ success: false, error: "Access Denied: Invalid or expired token." });
-    }
+  const token = req.query.token || req.body.token;
+  if (verifyToken(token)) {
+    req.userToken = token;
+    next();
+  } else {
+    res.status(401).json({ success: false, error: "Access Denied: Invalid or expired token." });
+  }
 }
-// --- END MIDDLEWARE ---
 
 function cleanAnsi(s) {
-    return String(s).replace(/\x1b\[[0-9;]*m/g, "");
+  return String(s).replace(/\x1b\[[0-9;]*m/g, "");
 }
 
+// --- Backup helpers: try JSON save endpoint first, fallback to multipart upload ---
+async function trySaveJsonFile(filename, content) {
+  try {
+    // many storage implementations expose /api/save/:filename that accepts JSON
+    const url = `${BACKUP_URL.replace(/\/$/, "")}/api/save/${encodeURIComponent(filename)}`;
+    await axios.post(url, content, { timeout: 15000 });
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function tryUploadMultipart(filename, bufferOrString) {
+  try {
+    const url = `${BACKUP_URL.replace(/\/$/, "")}/upload`;
+    const form = new FormData();
+    // FormData expects a stream / buffer — provide Buffer
+    const buffer = Buffer.isBuffer(bufferOrString) ? bufferOrString : Buffer.from(String(bufferOrString));
+    form.append("file", buffer, { filename });
+
+    await axios.post(url, form, {
+      headers: form.getHeaders(),
+      maxBodyLength: Infinity,
+      timeout: 20000
+    });
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+// Generic upload: first try JSON save API, fallback to multipart file upload
+async function uploadToStorage(filename, data) {
+  try {
+    // If data is object, send as JSON body; else send as text content to JSON endpoint
+    const jsonAttempt = await trySaveJsonFile(filename, typeof data === "object" ? data : { data: String(data) });
+    if (jsonAttempt) return true;
+    // fallback to multipart upload
+    const multipartAttempt = await tryUploadMultipart(filename, typeof data === "object" ? JSON.stringify(data, null, 2) : String(data));
+    return multipartAttempt;
+  } catch (err) {
+    return false;
+  }
+}
+
+// appendLog now uploads older chunks to storage to keep memory low
 function appendLog(id, chunk) {
-    const bot = bots.get(id);
-    if (!bot) return;
-    const txt = cleanAnsi(String(chunk));
-    bot.logs.push(txt);
-    if (bot.logs.length > 3000) bot.logs.splice(0, bot.logs.length - 3000);
-    io.to(id).emit("log", { id, text: txt });
+  const bot = bots.get(id);
+  if (!bot) return;
+  const txt = cleanAnsi(String(chunk));
+  bot.logs.push(txt);
+
+  // If logs exceed LOG_LOCAL_KEEP, extract oldest chunk and upload it asynchronously
+  if (bot.logs.length > LOG_LOCAL_KEEP) {
+    const overflowCount = bot.logs.length - LOG_LOCAL_KEEP;
+    // limit upload chunk size
+    const chunkCount = Math.min(overflowCount, LOG_UPLOAD_CHUNK);
+    const uploadChunk = bot.logs.splice(0, chunkCount); // remove oldest lines
+    // prepare content
+    const content = uploadChunk.join("");
+    const filename = `${bot.id}_logs_${Date.now()}.txt`;
+    // fire-and-forget (no blocking)
+    uploadToStorage(filename, content).catch(e => {
+      // if upload fails, push chunk back but keep small memory footprint: only keep last LOG_LOCAL_KEEP
+      console.error("Log upload failed for", bot.id, e.message || e);
+      // attempt to append failure note to current logs (bounded)
+      bot.logs.unshift(`[log-upload-failed ${new Date().toISOString()}]\n`);
+      // If push back would exceed LOG_LOCAL_KEEP, trim again
+      if (bot.logs.length > LOG_LOCAL_KEEP) {
+        bot.logs.splice(0, bot.logs.length - LOG_LOCAL_KEEP);
+      }
+    });
+  }
+
+  // enforce absolute maximum safety cap (in case)
+  if (bot.logs.length > LOG_LOCAL_KEEP * 2) {
+    bot.logs = bot.logs.slice(-LOG_LOCAL_KEEP);
+  }
+
+  io.to(id).emit("log", { id, text: txt });
 }
 
+// uptime formatting unchanged
 function formatUptime(ms) {
-    if (!ms || ms < 0) return '0h 0m 0s';
-    const seconds = Math.floor(ms / 1000);
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours}h ${minutes}m ${secs}s`;
+  if (!ms || ms < 0) return '0h 0m 0s';
+  const seconds = Math.floor(ms / 1000);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return `${hours}h ${minutes}m ${secs}s`;
 }
-
 
 function emitBots() {
-    const now = Date.now();
-    const list = Array.from(bots.values()).map(b => ({
-        id: b.id,
-        name: b.name,
-        repoUrl: b.repoUrl,
-        entry: b.entry,
-        status: b.status,
-        startTime: b.startTime || null,
-        dir: b.dir,
-        port: b.port || null,
-        // ✅ বটের রানিং টাইম হিসেব করে পাঠানো হচ্ছে (Uptime)
-        botUptime: b.startTime && b.status === 'running' ? formatUptime(now - b.startTime) : (b.startTime ? formatUptime(b.lastDuration || 0) : 'N/A')
-    }));
-    io.emit("bots", list);
+  const now = Date.now();
+  const list = Array.from(bots.values()).map(b => ({
+    id: b.id,
+    name: b.name,
+    repoUrl: b.repoUrl,
+    entry: b.entry,
+    status: b.status,
+    startTime: b.startTime || null,
+    dir: b.dir,
+    port: b.port || null,
+    botUptime: b.startTime && b.status === 'running' ? formatUptime(now - b.startTime) : (b.startTime ? formatUptime(b.lastDuration || 0) : 'N/A')
+  }));
+  io.emit("bots", list);
 }
 
 function getRandomPort(base = 10000) {
-    return base + Math.floor(Math.random() * 40000);
+  return base + Math.floor(Math.random() * 40000);
 }
 
 function startBot(id, restartCount = 0) {
-    const bot = bots.get(id);
-    if (!bot || bot.proc) return;
+  const bot = bots.get(id);
+  if (!bot || bot.proc) return;
 
-    const entryPath = path.join(bot.dir, bot.entry || "index.js");
-    if (!fs.existsSync(entryPath)) {
-        appendLog(id, `❌ Entry not found: ${bot.entry}\n`);
-        bot.status = "error";
-        emitBots();
-        return;
+  const entryPath = path.join(bot.dir, bot.entry || "index.js");
+  if (!fs.existsSync(entryPath)) {
+    appendLog(id, `❌ Entry not found: ${bot.entry}\n`);
+    bot.status = "error";
+    emitBots();
+    return;
+  }
+
+  if (!bot.port) bot.port = getRandomPort();
+
+  appendLog(id, `🚀 Starting bot: node ${bot.entry} (PORT=${bot.port})\n`);
+  const proc = spawn("node", [bot.entry], {
+    cwd: bot.dir,
+    shell: true,
+    env: { ...process.env, NODE_ENV: "production", PORT: bot.port },
+  });
+
+  bot.proc = proc;
+  bot.status = "running";
+  bot.startTime = Date.now();
+  delete bot.lastDuration;
+  emitBots();
+
+  proc.stdout.on("data", d => appendLog(id, d));
+  proc.stderr.on("data", d => appendLog(id, d));
+
+  proc.on("error", err => {
+    appendLog(id, `⚠️ Process error: ${err.message}\n`);
+  });
+
+  proc.on("close", (code) => {
+    appendLog(id, `🛑 Bot exited (code=${code})\n`);
+    if (bot.startTime) {
+      bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
     }
 
-    if (!bot.port) bot.port = getRandomPort();
-
-    appendLog(id, `🚀 Starting bot: node ${bot.entry} (PORT=${bot.port})\n`);
-    const proc = spawn("node", [bot.entry], {
-        cwd: bot.dir,
-        shell: true,
-        env: { ...process.env, NODE_ENV: "production", PORT: bot.port },
-    });
-
-    bot.proc = proc;
-    bot.status = "running";
-    bot.startTime = Date.now(); // স্টার্ট টাইম সেট
-    delete bot.lastDuration; // আগের ডিউরেশন মুছে ফেলা
+    bot.proc = null;
+    bot.status = "stopped";
+    delete bot.startTime;
     emitBots();
 
-    proc.stdout.on("data", d => appendLog(id, d));
-    proc.stderr.on("data", d => appendLog(id, d));
+    if (code === 0) return;
 
-    proc.on("error", err => {
-        appendLog(id, `⚠️ Process error: ${err.message}\n`);
-    });
+    if (code === "EADDRINUSE") {
+      appendLog(id, "⚠️ Port in use. Assigning new port...\n");
+      bot.port = getRandomPort();
+    }
 
-    proc.on("close", (code) => {
-        appendLog(id, `🛑 Bot exited (code=${code})\n`);
-        // স্টপ হওয়ার সময় টোটাল রানিং টাইম সেভ করা
-        if (bot.startTime) {
-            bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
-        }
-        
-        bot.proc = null;
-        bot.status = "stopped";
-        delete bot.startTime; // স্টার্ট টাইম মুছে ফেলা
-        emitBots();
-
-        if (code === 0) return; 
-        
-        if (code === "EADDRINUSE") {
-            appendLog(id, "⚠️ Port in use. Assigning new port...\n");
-            bot.port = getRandomPort();
-        }
-
-        if (restartCount < 5) {
-            appendLog(id, `🔁 Restarting in 5s (try ${restartCount + 1}/5)\n`);
-            setTimeout(() => startBot(id, restartCount + 1), 5000);
-        } else {
-            appendLog(id, "❌ Max restart attempts reached. Bot stopped.\n");
-        }
-    });
+    if (restartCount < 5) {
+      appendLog(id, `🔁 Restarting in 5s (try ${restartCount + 1}/5)\n`);
+      setTimeout(() => startBot(id, restartCount + 1), 5000);
+    } else {
+      appendLog(id, "❌ Max restart attempts reached. Bot stopped.\n");
+    }
+  });
 }
 
 async function updateBot(id) {
-    const bot = bots.get(id);
-    if (!bot) return;
-    
-    // ✅ ফিক্সড লজিক: পুরাতন প্রসেস কিল করার এবং স্টেটস পরিষ্কার করার আপডেট
-    if (bot.proc) {
-        appendLog(id, "⚠️ Stopping previous instance before update...\n");
-        
-        // প্রসেস কিল করার আগে রানিং টাইম সেভ করা হচ্ছে
-        if (bot.startTime) {
-            bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
-        }
-        
-        // 🛑 গুরুত্বপূর্ণ: প্রসেস ইভেন্ট লিসেনার রিমুভ করা
-        // এটি নিশ্চিত করবে যে 'close' ইভেন্টটি পরবর্তীতে startBot() ট্রিগার করবে না
-        bot.proc.removeAllListeners('close'); 
-        bot.proc.kill('SIGTERM'); // SIGTERM দিয়ে সঠিকভাবে বন্ধ করার চেষ্টা
-        
-        bot.proc = null;
-        delete bot.startTime; 
+  const bot = bots.get(id);
+  if (!bot) return;
+
+  if (bot.proc) {
+    appendLog(id, "⚠️ Stopping previous instance before update...\n");
+    if (bot.startTime) {
+      bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
     }
-    
-    bot.status = "updating";
+    bot.proc.removeAllListeners('close');
+    bot.proc.kill('SIGTERM');
+
+    bot.proc = null;
+    delete bot.startTime;
+  }
+
+  bot.status = "updating";
+  emitBots();
+  appendLog(id, "🔄 Fetching latest changes (git pull)...\n");
+
+  try {
+    const git = simpleGit(bot.dir);
+    const pullResult = await git.pull();
+    appendLog(id, `✅ Git Pull successful: ${pullResult.summary.changes} files changed\n`);
+
+    bot.status = "installing";
     emitBots();
-    appendLog(id, "🔄 Fetching latest changes (git pull)...\n");
+    appendLog(id, `📦 Running npm install...\n`);
 
+    await new Promise((resolve, reject) => {
+      const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], {
+        cwd: bot.dir,
+        shell: true,
+      });
+      npm.stdout.on("data", d => appendLog(id, d));
+      npm.stderr.on("data", d => appendLog(id, d));
+      npm.on("close", code => code === 0 ? resolve() : reject(new Error("npm install failed")));
+    });
+
+    appendLog(id, `✅ Install complete, restarting bot\n`);
+  } catch (err) {
+    appendLog(id, `❌ Update failed: ${err.message}\n`);
+  } finally {
+    bot.status = "stopped";
+    emitBots();
+
+    // upload small bot meta/info to storage so we have record
     try {
-        const git = simpleGit(bot.dir);
-        
-        const pullResult = await git.pull();
-        appendLog(id, `✅ Git Pull successful: ${pullResult.summary.changes} files changed\n`);
-
-        bot.status = "installing";
-        emitBots();
-        appendLog(id, `📦 Running npm install...\n`);
-
-        await new Promise((resolve, reject) => {
-            const npm = spawn("npm", ["install", "--no-audit", "--no-fund"], {
-                cwd: bot.dir,
-                shell: true,
-            });
-            npm.stdout.on("data", d => appendLog(id, d));
-            npm.stderr.on("data", d => appendLog(id, d));
-            npm.on("close", code => code === 0 ? resolve() : reject(new Error("npm install failed")));
-        });
-        
-        appendLog(id, `✅ Install complete, restarting bot\n`);
-        
-    } catch (err) {
-        appendLog(id, `❌ Update failed: ${err.message}\n`);
-    } finally {
-        bot.status = "stopped";
-        emitBots();
-        startBot(id);
+      const metaFilename = `${bot.id}_info.json`;
+      await uploadToStorage(metaFilename, {
+        id: bot.id,
+        name: bot.name,
+        repoUrl: bot.repoUrl,
+        entry: bot.entry,
+        updated_at: new Date().toISOString()
+      });
+    } catch (e) {
+      // ignore
     }
+
+    startBot(id);
+  }
 }
 
 
 // --- API ENDPOINTS ---
-
-// ✅ টোকেন জেনারেট করার API Endpoint (POST এবং GET দুটোই হ্যান্ডেল করবে)
 function handleTokenGeneration(req, res) {
-    const key = req.query.key || req.body.key; 
+  const key = req.query.key || req.body.key;
 
-    if (key && key === PANEL_SECRET_KEY) {
-        const token = generateToken(key);
-        
-        // ✅ চূড়ান্ত JSON ফরম্যাট
-        res.json({ 
-            success: true, 
-            token: token, 
-            expires_in: "6h", 
-            host_name: "TAHSIN VEX", 
-            author: "LIKHON", 
-            generated_at: new Date().toISOString() 
-        });
-    } else {
-        res.status(401).json({ success: false, error: "Invalid Key." });
-    }
+  if (key && key === PANEL_SECRET_KEY) {
+    const token = generateToken(key);
+    res.json({
+      success: true,
+      token: token,
+      expires_in: "6h",
+      host_name: "TAHSIN VEX",
+      author: "LIKHON",
+      generated_at: new Date().toISOString()
+    });
+  } else {
+    res.status(401).json({ success: false, error: "Invalid Key." });
+  }
 }
 
 app.post("/api/generate-token", handleTokenGeneration);
 app.get("/api/generate-token", handleTokenGeneration);
 
-
-// ✅ টোকেন ভেরিফাই করার API (POST) 
 app.post("/api/verify", (req, res) => {
-    const { token } = req.body;
-    if (verifyToken(token)) {
-        const expiryData = activeTokens.get(token);
-        res.json({ success: true, message: "Token Valid", expires_in: expiryData.expiry - Date.now() });
-    } else {
-        res.status(401).json({ success: false, error: "Invalid or expired token." });
-    }
+  const { token } = req.body;
+  if (verifyToken(token)) {
+    const expiryData = activeTokens.get(token);
+    res.json({ success: true, message: "Token Valid", expires_in: expiryData.expiry - Date.now() });
+  } else {
+    res.status(401).json({ success: false, error: "Invalid or expired token." });
+  }
 });
 
-
-// ⚠️ নিম্নলিখিত সমস্ত API Endpoints-এ 'enforceToken' middleware যোগ করা হয়েছে
 app.post("/api/deploy", enforceToken, async (req, res) => {
   try {
     const { repoUrl, name, entry = "index.js" } = req.body;
@@ -328,6 +399,17 @@ app.post("/api/deploy", enforceToken, async (req, res) => {
     bots.get(id).status = "stopped";
     emitBots();
     appendLog(id, `✅ Install done, starting in 2s\n`);
+
+    // Upload small meta to storage (non-blocking)
+    const botMeta = {
+      id,
+      name: safeName,
+      repoUrl,
+      entry,
+      created_at: new Date().toISOString()
+    };
+    uploadToStorage(`${id}_meta.json`, botMeta).catch(() => {});
+
     setTimeout(() => startBot(id), 2000);
 
     res.json({ id, name: safeName, dir: appDir });
@@ -336,7 +418,7 @@ app.post("/api/deploy", enforceToken, async (req, res) => {
   }
 });
 
-// --- Protected API Endpoints ---
+// Protected API Endpoints
 app.post("/api/:id/start", enforceToken, (req, res) => {
   startBot(req.params.id);
   res.json({ message: "starting" });
@@ -346,27 +428,25 @@ app.post("/api/:id/stop", enforceToken, (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   if (bot.proc) {
-    // স্টপ হওয়ার সময় টোটাল রানিং টাইম সেভ করা
     if (bot.startTime) {
-        bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
+      bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
     }
     bot.proc.kill();
   }
   bot.proc = null;
   bot.status = "stopped";
-  delete bot.startTime; // স্টার্ট টাইম মুছে ফেলা
+  delete bot.startTime;
   emitBots();
   appendLog(req.params.id, "🟡 Stopped\n");
   res.json({ message: "stopped" });
 });
 
 app.post("/api/:id/update", enforceToken, (req, res) => {
-    const id = req.params.id;
-    const bot = bots.get(id);
-    if (!bot) return res.status(404).json({ error: "bot not found" });
-    
-    updateBot(id); 
-    res.json({ message: "update started" });
+  const id = req.params.id;
+  const bot = bots.get(id);
+  if (!bot) return res.status(404).json({ error: "bot not found" });
+  updateBot(id);
+  res.json({ message: "update started" });
 });
 
 app.post("/api/:id/restart", enforceToken, (req, res) => {
@@ -374,9 +454,8 @@ app.post("/api/:id/restart", enforceToken, (req, res) => {
   const bot = bots.get(id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
   if (bot.proc) {
-     // স্টপ হওয়ার সময় টোটাল রানিং টাইম সেভ করা
     if (bot.startTime) {
-        bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
+      bot.lastDuration = (bot.lastDuration || 0) + (Date.now() - bot.startTime);
     }
     bot.proc.kill();
   }
@@ -391,8 +470,8 @@ app.delete("/api/:id/delete", enforceToken, (req, res) => {
   if (!bot) return res.status(404).json({ error: "bot not found" });
   try {
     if (bot.proc) {
-        bot.proc.removeAllListeners('close'); // নিশ্চিত করা হলো delete-এর সময় যেন কোনো অটো-রিস্টার্ট না হয়
-        bot.proc.kill();
+      bot.proc.removeAllListeners('close');
+      bot.proc.kill();
     }
     if (fs.existsSync(bot.dir)) fs.rmSync(bot.dir, { recursive: true, force: true });
     bots.delete(id);
@@ -423,7 +502,15 @@ app.get("/api/bots", enforceToken, (req, res) => {
 app.get("/api/:id/logs", enforceToken, (req, res) => {
   const bot = bots.get(req.params.id);
   if (!bot) return res.status(404).json({ error: "bot not found" });
-  res.json({ logs: bot.logs.slice(-2000) });
+  // return last local logs and provide a storage URL hint for older logs
+  const localLogs = bot.logs.slice(-LOG_LOCAL_KEEP);
+  const storageFilename = `${bot.id}_logs.txt`; // conventional name to check
+  const storageUrlCandidates = [
+    `${BACKUP_URL.replace(/\/$/, "")}/data/${storageFilename}`,
+    `${BACKUP_URL.replace(/\/$/, "")}/${storageFilename}`,
+    `${BACKUP_URL.replace(/\/$/, "")}/api/load/${encodeURIComponent(storageFilename)}`
+  ];
+  res.json({ logs: localLogs, storageUrls: storageUrlCandidates });
 });
 
 app.get("/api/host", enforceToken, (req, res) => {
@@ -441,8 +528,7 @@ app.get("/api/host", enforceToken, (req, res) => {
       totalGB: +(total / 1024 / 1024 / 1024).toFixed(2),
       freeGB: +(free / 1024 / 1024 / 1024).toFixed(2),
     },
-    // ✅ Host-এর আসল Uptime সেকেন্ডে পাঠানো হচ্ছে
-    uptime: uptimeSeconds, 
+    uptime: uptimeSeconds,
     bots: bots.size,
   });
 });
@@ -476,5 +562,5 @@ app.get("/", (req, res) =>
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`✅ LIKHON PANEL running on port ${PORT}`));
 
-// ✅ প্রতি ৫ সেকেন্ডে বটের স্ট্যাটাস আপডেট করার জন্য timer (Emit Bots)
+// periodic emit
 setInterval(emitBots, 5000);
