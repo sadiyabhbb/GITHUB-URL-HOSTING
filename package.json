@@ -15,15 +15,10 @@
     "simple-git": "^3.19.0",
     "body-parser": "^1.20.2",
     "uuid": "^9.0.1",
-    "moment-timezone": "^0.5.45",
-    "axios": "^1.7.4"
+    "moment-timezone": "^0.5.45"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0",
-    "module-alias": "^2.2.3"
-  },
-  "_moduleAliases": {
-    "data": "node_modules/axios/index.js"
+    "nodemon": "^3.1.0"
   },
   "engines": {
     "node": "20.x"
